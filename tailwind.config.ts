@@ -57,6 +57,17 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Game Engine Colors
+        engine: {
+          bg: "hsl(var(--engine-bg))",
+          panel: "hsl(var(--engine-panel))",
+          "panel-hover": "hsl(var(--engine-panel-hover))",
+          toolbar: "hsl(var(--engine-toolbar))",
+          viewport: "hsl(var(--engine-viewport))",
+          grid: "hsl(var(--engine-grid))",
+          selection: "hsl(var(--engine-selection))",
+          handle: "hsl(var(--engine-handle))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

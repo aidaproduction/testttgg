@@ -2,57 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Game Engine 2D Design System - Dark Theme with Purple Accents */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Game Engine Dark Theme */
+    --background: 225 12% 9%;
+    --foreground: 220 18% 85%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 225 15% 12%;
+    --card-foreground: 220 18% 85%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 225 15% 12%;
+    --popover-foreground: 220 18% 85%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 220 18% 95%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 225 15% 15%;
+    --secondary-foreground: 220 18% 75%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 225 15% 15%;
+    --muted-foreground: 220 10% 55%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 262 60% 50%;
+    --accent-foreground: 220 18% 95%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 220 18% 95%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 225 15% 18%;
+    --input: 225 15% 18%;
+    --ring: 262 83% 58%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Game Engine Specific Colors */
+    --engine-bg: 225 12% 9%;
+    --engine-panel: 225 15% 12%;
+    --engine-panel-hover: 225 15% 15%;
+    --engine-toolbar: 225 18% 14%;
+    --engine-viewport: 225 12% 8%;
+    --engine-grid: 220 10% 25%;
+    --engine-selection: 262 83% 58%;
+    --engine-handle: 262 100% 70%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(262 83% 58%), hsl(281 100% 65%));
+    --gradient-panel: linear-gradient(180deg, hsl(225 15% 12%), hsl(225 15% 10%));
+    --gradient-button: linear-gradient(135deg, hsl(262 60% 50%), hsl(262 70% 55%));
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Shadows */
+    --shadow-panel: 0 4px 12px hsla(225, 15%, 5%, 0.4);
+    --shadow-button: 0 2px 8px hsla(262, 83%, 58%, 0.25);
+    --shadow-viewport: inset 0 0 0 1px hsla(220, 10%, 25%, 0.3);
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Animations */
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 225 15% 12%;
+    --sidebar-foreground: 220 18% 75%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 220 18% 95%;
+    --sidebar-accent: 225 15% 15%;
+    --sidebar-accent-foreground: 220 18% 75%;
+    --sidebar-border: 225 15% 18%;
+    --sidebar-ring: 262 83% 58%;
   }
 
   .dark {
