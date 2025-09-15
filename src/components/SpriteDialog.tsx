@@ -3,8 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X, Sparkles } from "lucide-react";
+import { X, Sparkles, Image, Palette } from "lucide-react";
 import { GameObject } from "./GameEngine";
+import { ColorPicker } from "./ColorPicker";
 import { cn } from "@/lib/utils";
 
 interface SpriteDialogProps {
@@ -29,6 +30,8 @@ const SPRITE_COLORS = [
 export const SpriteDialog = ({ open, onClose, onSpriteCreate }: SpriteDialogProps) => {
   const [spriteName, setSpriteName] = useState("");
   const [selectedColor, setSelectedColor] = useState(SPRITE_COLORS[0]);
+  const [selectedTexture, setSelectedTexture] = useState<string>("");
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   const handleCreate = () => {
     if (!spriteName.trim()) return;
@@ -44,37 +47,50 @@ export const SpriteDialog = ({ open, onClose, onSpriteCreate }: SpriteDialogProp
       color: selectedColor,
       rotation: 0,
       scale: { x: 1, y: 1 },
+      texture: selectedTexture,
+      components: [],
     };
 
     onSpriteCreate(newSprite);
     setSpriteName("");
     setSelectedColor(SPRITE_COLORS[0]);
+    setSelectedTexture("");
+    setShowColorPicker(false);
   };
 
   const handleClose = () => {
     setSpriteName("");
     setSelectedColor(SPRITE_COLORS[0]);
+    setSelectedTexture("");
+    setShowColorPicker(false);
     onClose();
+  };
+
+  const handleTextureSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setSelectedTexture(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="bg-engine-panel border-border max-w-md">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-foreground">
-              <Sparkles className="w-5 h-5 text-primary" />
-              Criar Objeto
-            </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClose}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
+          <DialogTitle className="flex items-center gap-2 text-foreground">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Criar Objeto
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -93,24 +109,55 @@ export const SpriteDialog = ({ open, onClose, onSpriteCreate }: SpriteDialogProp
             />
           </div>
 
-          {/* Color Selection */}
+          {/* Texture Selection */}
           <div>
-            <Label className="text-sm font-medium mb-3 block">Cor</Label>
-            <div className="grid grid-cols-5 gap-2">
-              {SPRITE_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setSelectedColor(color)}
-                  className={cn(
-                    "w-12 h-12 rounded-lg border-2 transition-all hover:scale-105",
-                    selectedColor === color
-                      ? "border-primary shadow-lg shadow-primary/25"
-                      : "border-border hover:border-muted-foreground"
-                  )}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+            <Label className="text-sm font-medium mb-3 block">Textura</Label>
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant="outline"
+                onClick={handleTextureSelect}
+                className="flex-1 bg-engine-toolbar border-border hover:bg-engine-panel-hover"
+              >
+                <Image className="w-4 h-4 mr-2" />
+                Escolher Imagem
+              </Button>
             </div>
+            {selectedTexture && (
+              <div className="mb-4">
+                <img 
+                  src={selectedTexture} 
+                  alt="Preview" 
+                  className="w-20 h-20 object-cover rounded border border-border"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Color Selection */}
+          <div className="relative">
+            <Label className="text-sm font-medium mb-3 block">Cor</Label>
+            <Button
+              variant="outline"
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              className="w-full bg-engine-toolbar border-border hover:bg-engine-panel-hover justify-start"
+            >
+              <div 
+                className="w-6 h-6 rounded mr-2 border border-border"
+                style={{ backgroundColor: selectedColor }}
+              />
+              <Palette className="w-4 h-4 mr-2" />
+              Escolher Cor
+            </Button>
+            
+            {showColorPicker && (
+              <div className="mt-2">
+                <ColorPicker
+                  value={selectedColor}
+                  onChange={setSelectedColor}
+                  onClose={() => setShowColorPicker(false)}
+                />
+              </div>
+            )}
           </div>
 
           {/* Actions */}

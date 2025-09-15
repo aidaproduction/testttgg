@@ -3,6 +3,7 @@ import { Toolbar } from "./Toolbar";
 import { Sidebar } from "./Sidebar";
 import { Viewport } from "./Viewport";
 import { SpriteDialog } from "./SpriteDialog";
+import { GridPanel } from "./GridPanel";
 
 export interface GameObject {
   id: string;
@@ -15,6 +16,16 @@ export interface GameObject {
   color: string;
   rotation?: number;
   scale?: { x: number; y: number };
+  texture?: string;
+  components?: GameComponent[];
+}
+
+export interface GameComponent {
+  id: string;
+  type: 'rigidbody' | 'boxCollider' | 'script' | 'visualScript';
+  name: string;
+  enabled: boolean;
+  properties?: Record<string, any>;
 }
 
 export interface EngineState {
@@ -41,6 +52,7 @@ export const GameEngine = () => {
   });
 
   const [showSpriteDialog, setShowSpriteDialog] = useState(false);
+  const [showGridPanel, setShowGridPanel] = useState(false);
 
   const handlePlay = () => {
     setEngineState(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
@@ -92,6 +104,10 @@ export const GameEngine = () => {
     setEngineState(prev => ({ ...prev, snapToGrid: !prev.snapToGrid }));
   };
 
+  const handleGridPanelToggle = () => {
+    setShowGridPanel(!showGridPanel);
+  };
+
   return (
     <div className="h-screen bg-engine-bg text-foreground overflow-hidden">
       {/* Top Toolbar */}
@@ -103,7 +119,19 @@ export const GameEngine = () => {
         onCreateSprite={handleCreateSprite}
         onGridToggle={handleGridToggle}
         onSnapToggle={handleSnapToggle}
+        onGridPanelToggle={handleGridPanelToggle}
+        showGridPanel={showGridPanel}
       />
+      
+      {/* Grid Panel */}
+      {showGridPanel && (
+        <GridPanel
+          showGrid={engineState.showGrid}
+          snapToGrid={engineState.snapToGrid}
+          onGridToggle={handleGridToggle}
+          onSnapToggle={handleSnapToggle}
+        />
+      )}
       
       {/* Main Content */}
       <div className="flex h-[calc(100vh-64px)]">

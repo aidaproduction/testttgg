@@ -14,9 +14,13 @@ import {
   Maximize2,
   RotateCw,
   Zap,
-  Settings
+  Settings,
+  Plus,
+  Code,
+  Workflow
 } from "lucide-react";
-import { GameObject } from "./GameEngine";
+import { GameObject, GameComponent } from "./GameEngine";
+import { ComponentsDialog } from "./ComponentsDialog";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -36,6 +40,7 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState<'objects' | 'properties'>('objects');
   const [expandedSections, setExpandedSections] = useState<string[]>(['transform']);
+  const [showComponentsDialog, setShowComponentsDialog] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => 
@@ -73,6 +78,50 @@ export const Sidebar = ({
         break;
     }
     
+    onObjectUpdate(updatedObject);
+  };
+
+  const handleComponentAdd = (componentType: GameComponent['type']) => {
+    if (!selectedObject) return;
+
+    const newComponent: GameComponent = {
+      id: `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: componentType,
+      name: componentType.charAt(0).toUpperCase() + componentType.slice(1),
+      enabled: true,
+      properties: {}
+    };
+
+    const updatedObject = {
+      ...selectedObject,
+      components: [...(selectedObject.components || []), newComponent]
+    };
+
+    onObjectUpdate(updatedObject);
+    setShowComponentsDialog(false);
+  };
+
+  const handleComponentToggle = (componentId: string, enabled: boolean) => {
+    if (!selectedObject) return;
+
+    const updatedObject = {
+      ...selectedObject,
+      components: selectedObject.components?.map(comp =>
+        comp.id === componentId ? { ...comp, enabled } : comp
+      ) || []
+    };
+
+    onObjectUpdate(updatedObject);
+  };
+
+  const handleComponentRemove = (componentId: string) => {
+    if (!selectedObject) return;
+
+    const updatedObject = {
+      ...selectedObject,
+      components: selectedObject.components?.filter(comp => comp.id !== componentId) || []
+    };
+
     onObjectUpdate(updatedObject);
   };
 
@@ -127,26 +176,26 @@ export const Sidebar = ({
                   <Card
                     key={object.id}
                     className={cn(
-                      "p-3 cursor-pointer bg-engine-panel hover:bg-engine-panel-hover border-border transition-colors",
+                      "p-2 cursor-pointer bg-engine-panel hover:bg-engine-panel-hover border-border transition-colors",
                       selectedObject?.id === object.id && "ring-2 ring-primary border-primary"
                     )}
                     onClick={() => onObjectSelect(object)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Box className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-medium">{object.name}</span>
+                        <Box className="w-3 h-3 text-primary" />
+                        <span className="text-xs font-medium">{object.name}</span>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-muted-foreground hover:text-destructive"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
                           onObjectDelete(object.id);
                         }}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   </Card>
@@ -266,17 +315,29 @@ export const Sidebar = ({
                       <ChevronRight className="w-4 h-4" />
                     )}
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-3 pt-2">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Rigidbody</span>
-                        <Switch />
+                  <CollapsibleContent className="space-y-2 pt-2">
+                    {selectedObject?.components?.filter(c => c.type === 'rigidbody' || c.type === 'boxCollider').map((component) => (
+                      <div key={component.id} className="flex items-center justify-between p-2 bg-engine-toolbar rounded">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-3 h-3 text-primary" />
+                          <span className="text-sm">{component.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch 
+                            checked={component.enabled}
+                            onCheckedChange={(enabled) => handleComponentToggle(component.id, enabled)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleComponentRemove(component.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Box Collider</span>
-                        <Switch />
-                      </div>
-                    </div>
+                    ))}
                   </CollapsibleContent>
                 </Collapsible>
 
@@ -296,23 +357,57 @@ export const Sidebar = ({
                       <ChevronRight className="w-4 h-4" />
                     )}
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-3 pt-2">
-                    <div className="space-y-2">
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start bg-engine-panel border-border hover:bg-engine-panel-hover"
-                      >
-                        Script
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start bg-engine-panel border-border hover:bg-engine-panel-hover"
-                      >
-                        Visual Script
-                      </Button>
-                    </div>
+                  <CollapsibleContent className="space-y-2 pt-2">
+                    {selectedObject?.components?.filter(c => c.type === 'script' || c.type === 'visualScript').map((component) => (
+                      <div key={component.id} className="space-y-2">
+                        <div className="flex items-center justify-between p-2 bg-engine-toolbar rounded">
+                          <div className="flex items-center gap-2">
+                            {component.type === 'script' ? (
+                              <Code className="w-3 h-3 text-primary" />
+                            ) : (
+                              <Workflow className="w-3 h-3 text-primary" />
+                            )}
+                            <span className="text-sm">{component.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch 
+                              checked={component.enabled}
+                              onCheckedChange={(enabled) => handleComponentToggle(component.id, enabled)}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleComponentRemove(component.id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 ml-5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs bg-engine-panel border-border hover:bg-engine-panel-hover"
+                            disabled
+                          >
+                            {component.type === 'script' ? 'Code Editor' : 'Visual Editor'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </CollapsibleContent>
                 </Collapsible>
+
+                {/* Add Component Button */}
+                <Button
+                  onClick={() => setShowComponentsDialog(true)}
+                  variant="outline"
+                  className="w-full justify-start bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Component
+                </Button>
               </div>
             ) : (
               <div className="text-center py-12">
@@ -325,6 +420,14 @@ export const Sidebar = ({
           </div>
         )}
       </div>
+
+      {/* Components Dialog */}
+      <ComponentsDialog
+        open={showComponentsDialog}
+        onClose={() => setShowComponentsDialog(false)}
+        onComponentAdd={handleComponentAdd}
+        existingComponents={selectedObject?.components || []}
+      />
     </div>
   );
 };

@@ -1,9 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { 
   Move, 
-  Search, 
-  Square, 
   RotateCw, 
+  Maximize2,
   Grid3X3, 
   Plus, 
   Play, 
@@ -19,6 +18,8 @@ interface ToolbarProps {
   onCreateSprite: () => void;
   onGridToggle: () => void;
   onSnapToggle: () => void;
+  onGridPanelToggle: () => void;
+  showGridPanel: boolean;
 }
 
 export const Toolbar = ({
@@ -28,7 +29,9 @@ export const Toolbar = ({
   onPlay,
   onCreateSprite,
   onGridToggle,
-  onSnapToggle
+  onSnapToggle,
+  onGridPanelToggle,
+  showGridPanel
 }: ToolbarProps) => {
   return (
     <div className="h-16 bg-engine-toolbar border-b border-border flex items-center justify-between px-4">
@@ -39,22 +42,19 @@ export const Toolbar = ({
             <Move className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-            <Search className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-            <Square className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
             <RotateCw className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+            <Maximize2 className="w-4 h-4" />
           </Button>
           <Button 
             variant="ghost" 
             size="sm" 
             className={cn(
               "text-muted-foreground hover:text-foreground",
-              showGrid && "text-primary bg-primary/10"
+              showGridPanel && "text-primary bg-primary/10"
             )}
-            onClick={onGridToggle}
+            onClick={onGridPanelToggle}
           >
             <Grid3X3 className="w-4 h-4" />
           </Button>

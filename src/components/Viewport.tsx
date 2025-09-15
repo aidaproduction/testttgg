@@ -95,18 +95,19 @@ export const Viewport = ({
       const worldPos = screenToWorld(touch.clientX, touch.clientY);
       const hitObject = getObjectAtPosition(worldPos.x, worldPos.y);
       
-      // Check for double tap
-      if (now - touchState.current.lastTouchTime < 300 && touchState.current.lastTouchCount === 1) {
-        // Double tap - select object
+      // Check for double tap (fast double click)
+      if (now - touchState.current.lastTouchTime < 250 && touchState.current.lastTouchCount === 1) {
+        // Double tap - select/deselect object
         if (hitObject) {
           onObjectSelect(hitObject);
-          // Calculate drag offset
+          setDraggedObject(hitObject);
           setDragOffset({
             x: worldPos.x - hitObject.x,
             y: worldPos.y - hitObject.y
           });
         } else {
           onObjectSelect(null);
+          setDraggedObject(null);
         }
       } else {
         // Single tap - start potential drag
@@ -233,37 +234,20 @@ export const Viewport = ({
       screenHeight
     );
     
-    // Draw selection outline
+    // Draw selection outline with purple glow effect
     if (engineState.selectedObject?.id === obj.id) {
-      ctx.strokeStyle = 'hsl(262, 83%, 58%)';
-      ctx.lineWidth = 2;
+      // Purple glow effect
+      ctx.shadowColor = '#8b5cf6';
+      ctx.shadowBlur = 15;
+      ctx.strokeStyle = '#8b5cf6';
+      ctx.lineWidth = 3;
       ctx.strokeRect(
-        screenX - screenWidth / 2 - 1,
-        screenY - screenHeight / 2 - 1,
-        screenWidth + 2,
-        screenHeight + 2
+        screenX - screenWidth / 2 - 2,
+        screenY - screenHeight / 2 - 2,
+        screenWidth + 4,
+        screenHeight + 4
       );
-      
-      // Draw selection handles
-      const handleSize = 8;
-      ctx.fillStyle = 'hsl(262, 100%, 70%)';
-      
-      // Corner handles
-      const corners = [
-        { x: screenX - screenWidth / 2, y: screenY - screenHeight / 2 },
-        { x: screenX + screenWidth / 2, y: screenY - screenHeight / 2 },
-        { x: screenX - screenWidth / 2, y: screenY + screenHeight / 2 },
-        { x: screenX + screenWidth / 2, y: screenY + screenHeight / 2 },
-      ];
-      
-      corners.forEach(corner => {
-        ctx.fillRect(
-          corner.x - handleSize / 2,
-          corner.y - handleSize / 2,
-          handleSize,
-          handleSize
-        );
-      });
+      ctx.shadowBlur = 0;
     }
   };
 
