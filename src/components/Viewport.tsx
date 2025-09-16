@@ -87,6 +87,10 @@ export const Viewport = ({
   // Handle touch start
   const handleTouchStart = useCallback((e: TouchEvent) => {
     e.preventDefault();
+    
+    // Disable interaction in play mode
+    if (engineState.isPlaying) return;
+    
     const touches = e.touches;
     const now = Date.now();
     
@@ -140,6 +144,10 @@ export const Viewport = ({
   // Handle touch move
   const handleTouchMove = useCallback((e: TouchEvent) => {
     e.preventDefault();
+    
+    // Disable interaction in play mode
+    if (engineState.isPlaying) return;
+    
     const touches = e.touches;
     
     if (touches.length === 1 && touchState.current.isDragging) {
@@ -187,6 +195,9 @@ export const Viewport = ({
   const handleTouchEnd = useCallback((e: TouchEvent) => {
     e.preventDefault();
     
+    // Disable interaction in play mode
+    if (engineState.isPlaying) return;
+    
     touchState.current.isDragging = false;
     touchState.current.initialPinchDistance = null;
     setDraggedObject(null);
@@ -224,8 +235,17 @@ export const Viewport = ({
     
     const screenX = (obj.x + engineState.panX) * engineState.zoom + width / 2;
     const screenY = (obj.y + engineState.panY) * engineState.zoom + height / 2;
-    const screenWidth = obj.width * engineState.zoom;
-    const screenHeight = obj.height * engineState.zoom;
+    const screenWidth = obj.width * engineState.zoom * (obj.scale?.x || 1);
+    const screenHeight = obj.height * engineState.zoom * (obj.scale?.y || 1);
+    
+    ctx.save();
+    
+    // Apply rotation if exists
+    if (obj.rotation) {
+      ctx.translate(screenX, screenY);
+      ctx.rotate((obj.rotation * Math.PI) / 180);
+      ctx.translate(-screenX, -screenY);
+    }
     
     // Draw object
     if (obj.texture) {
@@ -252,26 +272,25 @@ export const Viewport = ({
       );
     }
     
-    // Draw selection outline with soft purple glow
-    if (engineState.selectedObject?.id === obj.id) {
+    ctx.restore();
+    
+    // Draw selection outline with soft purple glow (simpler version)
+    if (engineState.selectedObject?.id === obj.id && !engineState.isPlaying) {
       ctx.save();
       
-      // Outer glow
+      // Simple purple glow effect
       ctx.shadowColor = '#8b5cf6';
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 8;
       ctx.strokeStyle = '#8b5cf6';
       ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = 0.8;
       
-      // Draw multiple layers for soft glow effect
-      for (let i = 0; i < 3; i++) {
-        ctx.strokeRect(
-          screenX - screenWidth / 2 - (i * 2),
-          screenY - screenHeight / 2 - (i * 2),
-          screenWidth + (i * 4),
-          screenHeight + (i * 4)
-        );
-      }
+      ctx.strokeRect(
+        screenX - screenWidth / 2 - 2,
+        screenY - screenHeight / 2 - 2,
+        screenWidth + 4,
+        screenHeight + 4
+      );
       
       ctx.restore();
     }
@@ -295,8 +314,9 @@ export const Viewport = ({
     // Draw grid
     drawGrid(ctx, width, height);
     
-    // Draw objects
-    engineState.objects.forEach(obj => {
+  // Draw objects sorted by zIndex
+    const sortedObjects = [...engineState.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+    sortedObjects.forEach(obj => {
       drawObject(ctx, obj, width, height);
     });
     
@@ -348,11 +368,13 @@ export const Viewport = ({
         style={{ touchAction: 'none' }}
       />
       
-      {/* Viewport Info */}
-      <div className="absolute top-4 left-4 bg-engine-panel/80 backdrop-blur-sm rounded px-3 py-1 text-xs text-muted-foreground">
-        Zoom: {Math.round(engineState.zoom * 100)}% | 
-        Pan: {Math.round(engineState.panX)}, {Math.round(engineState.panY)}
-      </div>
+      {/* Viewport Info - Only in editor mode */}
+      {!engineState.isPlaying && (
+        <div className="absolute top-4 left-4 bg-engine-panel/80 backdrop-blur-sm rounded px-3 py-1 text-xs text-muted-foreground">
+          Zoom: {Math.round(engineState.zoom * 100)}% | 
+          Pan: {Math.round(engineState.panX)}, {Math.round(engineState.panY)}
+        </div>
+      )}
       
       {/* Play Mode Indicator */}
       {engineState.isPlaying && (

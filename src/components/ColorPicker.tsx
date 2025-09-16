@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 const PRESET_COLORS = [
-  "#ffffff", "#f8f9fa", "#e9ecef", "#dee2e6", "#ced4da", "#adb5bd", "#6c757d", "#495057", "#343a40", "#212529",
-  "#ff6b6b", "#ee5a52", "#ff8787", "#ffa8a8", "#ffc9c9", "#ffe3e3", "#ffcccb", "#ff9999", "#ff6666", "#ff3333",
-  "#4ecdc4", "#45b7b8", "#6c5ce7", "#a29bfe", "#fd79a8", "#fdcb6e", "#e17055", "#00b894", "#00cec9", "#6c5ce7",
-  "#74b9ff", "#0984e3", "#a29bfe", "#6c5ce7", "#fd79a8", "#e84393", "#fdcb6e", "#f39c12", "#e17055", "#d63031",
-  "#00b894", "#00cec9", "#55a3ff", "#74b9ff", "#81ecec", "#00cec9", "#55efc4", "#00b894", "#fdcb6e", "#f39c12",
+  // Cores básicas para jogos
+  "#ffffff", "#000000", "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff",
+  "#808080", "#800000", "#008000", "#000080", "#808000", "#800080", "#008080", "#c0c0c0",
+  "#ffa500", "#ffc0cb", "#add8e6", "#f0e68c", "#dda0dd", "#98fb98", "#f5deb3", "#d3d3d3",
+  "#ff6347", "#40e0d0", "#ee82ee", "#90ee90", "#f4a460", "#da70d6", "#b0c4de", "#ffd700",
   "transparent"
 ];
 
@@ -45,14 +45,14 @@ export const ColorPicker = ({ value, onChange, onClose }: ColorPickerProps) => {
         </div>
         
         {/* Preset Colors Grid */}
-        <div className="grid grid-cols-10 gap-2">
+        <div className="grid grid-cols-8 gap-2">
           {PRESET_COLORS.map((color) => (
             <button
               key={color}
               onClick={() => handleColorSelect(color)}
               className={cn(
-                "w-8 h-8 rounded border-2 transition-all hover:scale-110 relative",
-                value === color ? "border-primary shadow-lg shadow-primary/25" : "border-border hover:border-muted-foreground"
+                "w-8 h-8 rounded-full border-2 transition-all hover:scale-110 relative shadow-sm",
+                value === color ? "border-primary shadow-lg shadow-primary/25 ring-2 ring-primary/30" : "border-border hover:border-muted-foreground"
               )}
               style={{ 
                 backgroundColor: color === 'transparent' ? 'transparent' : color,

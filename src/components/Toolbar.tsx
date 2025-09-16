@@ -6,7 +6,8 @@ import {
   Grid3X3, 
   Plus, 
   Play, 
-  Pause 
+  Pause,
+  Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ interface ToolbarProps {
   onSnapToggle: () => void;
   onGridPanelToggle: () => void;
   showGridPanel: boolean;
+  onViewportReset: () => void;
 }
 
 export const Toolbar = ({
@@ -31,7 +33,8 @@ export const Toolbar = ({
   onGridToggle,
   onSnapToggle,
   onGridPanelToggle,
-  showGridPanel
+  showGridPanel,
+  onViewportReset
 }: ToolbarProps) => {
   return (
     <div className="h-16 bg-engine-toolbar border-b border-border flex items-center justify-between px-4">
@@ -57,6 +60,15 @@ export const Toolbar = ({
             onClick={onGridPanelToggle}
           >
             <Grid3X3 className="w-4 h-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-muted-foreground hover:text-foreground"
+            onClick={onViewportReset}
+            title="Resetar Viewport"
+          >
+            <Home className="w-4 h-4" />
           </Button>
         </div>
       </div>

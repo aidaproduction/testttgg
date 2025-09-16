@@ -19,6 +19,8 @@ export interface GameObject {
   texture?: string;
   components?: GameComponent[];
   visible?: boolean;
+  zIndex?: number;
+  imageQuality?: number;
 }
 
 export interface GameComponent {
@@ -112,20 +114,38 @@ export const GameEngine = () => {
   return (
     <div className="h-screen bg-engine-bg text-foreground overflow-hidden">
       {/* Top Toolbar */}
-      <Toolbar 
-        isPlaying={engineState.isPlaying}
-        showGrid={engineState.showGrid}
-        snapToGrid={engineState.snapToGrid}
-        onPlay={handlePlay}
-        onCreateSprite={handleCreateSprite}
-        onGridToggle={handleGridToggle}
-        onSnapToggle={handleSnapToggle}
-        onGridPanelToggle={handleGridPanelToggle}
-        showGridPanel={showGridPanel}
-      />
+      {!engineState.isPlaying && (
+        <Toolbar 
+          isPlaying={engineState.isPlaying}
+          showGrid={engineState.showGrid}
+          snapToGrid={engineState.snapToGrid}
+          onPlay={handlePlay}
+          onCreateSprite={handleCreateSprite}
+          onGridToggle={handleGridToggle}
+          onSnapToggle={handleSnapToggle}
+          onGridPanelToggle={handleGridPanelToggle}
+          showGridPanel={showGridPanel}
+          onViewportReset={() => handleViewportChange({ zoom: 1, panX: 0, panY: 0 })}
+        />
+      )}
       
-      {/* Grid Panel */}
-      {showGridPanel && (
+      {/* Play Mode Toolbar - minimal */}
+      {engineState.isPlaying && (
+        <div className="h-16 bg-engine-toolbar border-b border-border flex items-center justify-between px-4">
+          <button
+            onClick={handlePlay}
+            className="bg-engine-panel hover:bg-engine-panel-hover rounded p-2 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Voltar ao Editor
+          </button>
+        </div>
+      )}
+      
+      {/* Grid Panel - Only in editor mode */}
+      {showGridPanel && !engineState.isPlaying && (
         <GridPanel
           showGrid={engineState.showGrid}
           snapToGrid={engineState.snapToGrid}
@@ -136,14 +156,16 @@ export const GameEngine = () => {
       
       {/* Main Content */}
       <div className="flex h-[calc(100vh-64px)]">
-        {/* Left Sidebar */}
-        <Sidebar 
-          objects={engineState.objects}
-          selectedObject={engineState.selectedObject}
-          onObjectSelect={handleObjectSelect}
-          onObjectUpdate={handleObjectUpdate}
-          onObjectDelete={handleObjectDelete}
-        />
+        {/* Left Sidebar - Only in editor mode */}
+        {!engineState.isPlaying && (
+          <Sidebar 
+            objects={engineState.objects}
+            selectedObject={engineState.selectedObject}
+            onObjectSelect={handleObjectSelect}
+            onObjectUpdate={handleObjectUpdate}
+            onObjectDelete={handleObjectDelete}
+          />
+        )}
         
         {/* Viewport */}
         <Viewport 

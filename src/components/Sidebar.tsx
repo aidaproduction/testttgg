@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Box, 
@@ -21,10 +22,14 @@ import {
   Eye,
   EyeOff,
   Image,
-  Palette
+  Palette,
+  Layers,
+  ChevronUp,
+  ChevronDown as ChevronDownIcon
 } from "lucide-react";
 import { GameObject, GameComponent } from "./GameEngine";
 import { ComponentsDialog } from "./ComponentsDialog";
+import { ColorPicker } from "./ColorPicker";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -45,6 +50,7 @@ export const Sidebar = ({
   const [activeTab, setActiveTab] = useState<'objects' | 'properties'>('objects');
   const [expandedSections, setExpandedSections] = useState<string[]>(['transform', 'appearance']);
   const [showComponentsDialog, setShowComponentsDialog] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => 
@@ -69,13 +75,21 @@ export const Sidebar = ({
     switch (transform) {
       case 'x':
       case 'y':
+      case 'width':
+      case 'height':
         updatedObject[transform] = value;
         break;
       case 'scaleX':
-        updatedObject.scale = { ...updatedObject.scale, x: value } as any;
+        updatedObject.scale = { 
+          x: value, 
+          y: updatedObject.scale?.y || 1 
+        };
         break;
       case 'scaleY':
-        updatedObject.scale = { ...updatedObject.scale, y: value } as any;
+        updatedObject.scale = { 
+          x: updatedObject.scale?.x || 1, 
+          y: value 
+        };
         break;
       case 'rotation':
         updatedObject.rotation = value;
@@ -156,7 +170,7 @@ export const Sidebar = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <ScrollArea className="flex-1">
         {activeTab === 'objects' ? (
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
@@ -277,6 +291,30 @@ export const Sidebar = ({
                       </div>
                     </div>
 
+                    {/* Size */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                        <Maximize2 className="w-3 h-3" />
+                        Tamanho
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          type="number"
+                          value={selectedObject.width}
+                          onChange={(e) => handleTransformChange('width', parseFloat(e.target.value) || 1)}
+                          className="bg-engine-panel border-border text-sm"
+                          min="1"
+                        />
+                        <Input
+                          type="number"
+                          value={selectedObject.height}
+                          onChange={(e) => handleTransformChange('height', parseFloat(e.target.value) || 1)}
+                          className="bg-engine-panel border-border text-sm"
+                          min="1"
+                        />
+                      </div>
+                    </div>
+
                     {/* Scale */}
                     <div>
                       <Label className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
@@ -290,6 +328,7 @@ export const Sidebar = ({
                           onChange={(e) => handleTransformChange('scaleX', parseFloat(e.target.value) || 1)}
                           className="bg-engine-panel border-border text-sm"
                           step="0.1"
+                          min="0.1"
                         />
                         <Input
                           type="number"
@@ -297,6 +336,7 @@ export const Sidebar = ({
                           onChange={(e) => handleTransformChange('scaleY', parseFloat(e.target.value) || 1)}
                           className="bg-engine-panel border-border text-sm"
                           step="0.1"
+                          min="0.1"
                         />
                       </div>
                     </div>
@@ -438,17 +478,35 @@ export const Sidebar = ({
                     )}
                   </CollapsibleTrigger>
                   <CollapsibleContent className="space-y-3 pt-2">
-                    {/* Color */}
+                     {/* Color */}
                     <div>
                       <Label className="text-xs text-muted-foreground mb-2 block">
                         Cor
                       </Label>
-                      <input
-                        type="color"
-                        value={selectedObject.color}
-                        onChange={(e) => handlePropertyChange('color', e.target.value)}
-                        className="w-full h-10 rounded border border-border bg-engine-panel"
-                      />
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowColorPicker(!showColorPicker)}
+                          className="w-full h-10 rounded border border-border bg-engine-panel flex items-center px-3 hover:bg-engine-panel-hover transition-colors"
+                        >
+                          <div 
+                            className="w-6 h-6 rounded border border-border mr-3"
+                            style={{ backgroundColor: selectedObject.color }}
+                          />
+                          <span className="text-sm">{selectedObject.color}</span>
+                        </button>
+                        {showColorPicker && (
+                          <div className="absolute top-12 left-0 z-50">
+                            <ColorPicker
+                              value={selectedObject.color}
+                              onChange={(color) => {
+                                handlePropertyChange('color', color);
+                                setShowColorPicker(false);
+                              }}
+                              onClose={() => setShowColorPicker(false)}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Texture */}
@@ -480,35 +538,76 @@ export const Sidebar = ({
                         {selectedObject.texture ? 'Alterar Imagem' : 'Escolher Imagem'}
                       </Button>
                       {selectedObject.texture && (
-                        <div className="mt-2 flex justify-between items-center">
-                          <img 
-                            src={selectedObject.texture} 
-                            alt="Preview" 
-                            className="w-16 h-16 object-cover rounded border border-border"
-                          />
+                        <div className="mt-2">
+                          <div className="flex justify-between items-center mb-2">
+                            <img 
+                              src={selectedObject.texture} 
+                              alt="Preview" 
+                              className="w-16 h-16 object-cover rounded border border-border"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePropertyChange('texture', '')}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          {/* Image Quality */}
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">
+                              Qualidade
+                            </Label>
+                            <Input
+                              type="number"
+                              value={selectedObject.imageQuality || 100}
+                              onChange={(e) => handlePropertyChange('imageQuality', Math.max(1, Math.min(100, parseInt(e.target.value) || 100)))}
+                              className="bg-engine-panel border-border text-sm"
+                              min="1"
+                              max="100"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Layer Order */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                        <Layers className="w-3 h-3" />
+                        Ordem das Camadas
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={selectedObject.zIndex || 0}
+                          onChange={(e) => handlePropertyChange('zIndex', parseInt(e.target.value) || 0)}
+                          className="bg-engine-panel border-border text-sm flex-1"
+                        />
+                        <div className="flex flex-col gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handlePropertyChange('texture', '')}
-                            className="text-muted-foreground hover:text-destructive"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => handlePropertyChange('zIndex', (selectedObject.zIndex || 0) + 1)}
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <ChevronUp className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => handlePropertyChange('zIndex', (selectedObject.zIndex || 0) - 1)}
+                          >
+                            <ChevronDownIcon className="w-3 h-3" />
                           </Button>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* Add Component Button */}
-                <Button
-                  onClick={() => setShowComponentsDialog(true)}
-                  variant="outline"
-                  className="w-full justify-start bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Component
-                </Button>
               </div>
             ) : (
               <div className="text-center py-12">
@@ -520,7 +619,21 @@ export const Sidebar = ({
             )}
           </div>
         )}
-      </div>
+      </ScrollArea>
+
+      {/* Add Component Button - Fixed at bottom when object is selected */}
+      {activeTab === 'properties' && selectedObject && (
+        <div className="p-4 border-t border-border bg-engine-panel">
+          <Button
+            onClick={() => setShowComponentsDialog(true)}
+            variant="outline"
+            className="w-full justify-start bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Component
+          </Button>
+        </div>
+      )}
 
       {/* Components Dialog */}
       <ComponentsDialog
