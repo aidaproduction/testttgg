@@ -17,7 +17,11 @@ import {
   Settings,
   Plus,
   Code,
-  Workflow
+  Workflow,
+  Eye,
+  EyeOff,
+  Image,
+  Palette
 } from "lucide-react";
 import { GameObject, GameComponent } from "./GameEngine";
 import { ComponentsDialog } from "./ComponentsDialog";
@@ -39,7 +43,7 @@ export const Sidebar = ({
   onObjectDelete
 }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState<'objects' | 'properties'>('objects');
-  const [expandedSections, setExpandedSections] = useState<string[]>(['transform']);
+  const [expandedSections, setExpandedSections] = useState<string[]>(['transform', 'appearance']);
   const [showComponentsDialog, setShowComponentsDialog] = useState(false);
 
   const toggleSection = (section: string) => {
@@ -186,17 +190,31 @@ export const Sidebar = ({
                         <Box className="w-3 h-3 text-primary" />
                         <span className="text-xs font-medium">{object.name}</span>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onObjectDelete(object.id);
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const updatedObject = { ...object, visible: !object.visible };
+                            onObjectUpdate(updatedObject);
+                          }}
+                        >
+                          {object.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onObjectDelete(object.id);
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -299,74 +317,28 @@ export const Sidebar = ({
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* Physics Section */}
-                <Collapsible open={expandedSections.includes('physics')}>
-                  <CollapsibleTrigger
-                    onClick={() => toggleSection('physics')}
-                    className="flex items-center justify-between w-full p-2 hover:bg-engine-panel-hover rounded"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4" />
-                      <span className="font-medium">Physics</span>
-                    </div>
-                    {expandedSections.includes('physics') ? (
-                      <ChevronDown className="w-4 h-4" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4" />
-                    )}
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 pt-2">
-                    {selectedObject?.components?.filter(c => c.type === 'rigidbody' || c.type === 'boxCollider').map((component) => (
-                      <div key={component.id} className="flex items-center justify-between p-2 bg-engine-toolbar rounded">
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-3 h-3 text-primary" />
-                          <span className="text-sm">{component.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Switch 
-                            checked={component.enabled}
-                            onCheckedChange={(enabled) => handleComponentToggle(component.id, enabled)}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleComponentRemove(component.id)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
+{/* Physics Section - Only show if components exist */}
+                {selectedObject?.components?.filter(c => c.type === 'rigidbody' || c.type === 'boxCollider').length > 0 && (
+                  <Collapsible open={expandedSections.includes('physics')}>
+                    <CollapsibleTrigger
+                      onClick={() => toggleSection('physics')}
+                      className="flex items-center justify-between w-full p-2 hover:bg-engine-panel-hover rounded"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4" />
+                        <span className="font-medium">Physics</span>
                       </div>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-
-                {/* Logic Section */}
-                <Collapsible open={expandedSections.includes('logic')}>
-                  <CollapsibleTrigger
-                    onClick={() => toggleSection('logic')}
-                    className="flex items-center justify-between w-full p-2 hover:bg-engine-panel-hover rounded"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Settings className="w-4 h-4" />
-                      <span className="font-medium">Logic</span>
-                    </div>
-                    {expandedSections.includes('logic') ? (
-                      <ChevronDown className="w-4 h-4" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4" />
-                    )}
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 pt-2">
-                    {selectedObject?.components?.filter(c => c.type === 'script' || c.type === 'visualScript').map((component) => (
-                      <div key={component.id} className="space-y-2">
-                        <div className="flex items-center justify-between p-2 bg-engine-toolbar rounded">
+                      {expandedSections.includes('physics') ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      {selectedObject?.components?.filter(c => c.type === 'rigidbody' || c.type === 'boxCollider').map((component) => (
+                        <div key={component.id} className="flex items-center justify-between p-2 bg-engine-toolbar rounded">
                           <div className="flex items-center gap-2">
-                            {component.type === 'script' ? (
-                              <Code className="w-3 h-3 text-primary" />
-                            ) : (
-                              <Workflow className="w-3 h-3 text-primary" />
-                            )}
+                            <Zap className="w-3 h-3 text-primary" />
                             <span className="text-sm">{component.name}</span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -384,18 +356,147 @@ export const Sidebar = ({
                             </Button>
                           </div>
                         </div>
-                        <div className="flex gap-2 ml-5">
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+{/* Logic Section - Only show if components exist */}
+                {selectedObject?.components?.filter(c => c.type === 'script' || c.type === 'visualScript').length > 0 && (
+                  <Collapsible open={expandedSections.includes('logic')}>
+                    <CollapsibleTrigger
+                      onClick={() => toggleSection('logic')}
+                      className="flex items-center justify-between w-full p-2 hover:bg-engine-panel-hover rounded"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Settings className="w-4 h-4" />
+                        <span className="font-medium">Logic</span>
+                      </div>
+                      {expandedSections.includes('logic') ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      {selectedObject?.components?.filter(c => c.type === 'script' || c.type === 'visualScript').map((component) => (
+                        <div key={component.id} className="space-y-2">
+                          <div className="flex items-center justify-between p-2 bg-engine-toolbar rounded">
+                            <div className="flex items-center gap-2">
+                              {component.type === 'script' ? (
+                                <Code className="w-3 h-3 text-primary" />
+                              ) : (
+                                <Workflow className="w-3 h-3 text-primary" />
+                              )}
+                              <span className="text-sm">{component.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Switch 
+                                checked={component.enabled}
+                                onCheckedChange={(enabled) => handleComponentToggle(component.id, enabled)}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleComponentRemove(component.id)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs bg-engine-panel border-border hover:bg-engine-panel-hover"
+                              disabled
+                            >
+                              {component.type === 'script' ? 'Code Editor' : 'Visual Editor'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Appearance Section */}
+                <Collapsible open={expandedSections.includes('appearance')}>
+                  <CollapsibleTrigger
+                    onClick={() => toggleSection('appearance')}
+                    className="flex items-center justify-between w-full p-2 hover:bg-engine-panel-hover rounded"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Palette className="w-4 h-4" />
+                      <span className="font-medium">Appearance</span>
+                    </div>
+                    {expandedSections.includes('appearance') ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 pt-2">
+                    {/* Color */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">
+                        Cor
+                      </Label>
+                      <input
+                        type="color"
+                        value={selectedObject.color}
+                        onChange={(e) => handlePropertyChange('color', e.target.value)}
+                        className="w-full h-10 rounded border border-border bg-engine-panel"
+                      />
+                    </div>
+
+                    {/* Texture */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">
+                        Textura
+                      </Label>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (e) => {
+                                handlePropertyChange('texture', e.target?.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          };
+                          input.click();
+                        }}
+                        className="w-full bg-engine-toolbar border-border hover:bg-engine-panel-hover justify-start"
+                      >
+                        <Image className="w-4 h-4 mr-2" />
+                        {selectedObject.texture ? 'Alterar Imagem' : 'Escolher Imagem'}
+                      </Button>
+                      {selectedObject.texture && (
+                        <div className="mt-2 flex justify-between items-center">
+                          <img 
+                            src={selectedObject.texture} 
+                            alt="Preview" 
+                            className="w-16 h-16 object-cover rounded border border-border"
+                          />
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="text-xs bg-engine-panel border-border hover:bg-engine-panel-hover"
-                            disabled
+                            onClick={() => handlePropertyChange('texture', '')}
+                            className="text-muted-foreground hover:text-destructive"
                           >
-                            {component.type === 'script' ? 'Code Editor' : 'Visual Editor'}
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
 

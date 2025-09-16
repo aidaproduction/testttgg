@@ -18,6 +18,7 @@ export interface GameObject {
   scale?: { x: number; y: number };
   texture?: string;
   components?: GameComponent[];
+  visible?: boolean;
 }
 
 export interface GameComponent {

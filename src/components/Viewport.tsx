@@ -220,34 +220,60 @@ export const Viewport = ({
   };
 
   const drawObject = (ctx: CanvasRenderingContext2D, obj: GameObject, width: number, height: number) => {
+    if (!obj.visible) return; // Don't draw invisible objects
+    
     const screenX = (obj.x + engineState.panX) * engineState.zoom + width / 2;
     const screenY = (obj.y + engineState.panY) * engineState.zoom + height / 2;
     const screenWidth = obj.width * engineState.zoom;
     const screenHeight = obj.height * engineState.zoom;
     
     // Draw object
-    ctx.fillStyle = obj.color;
-    ctx.fillRect(
-      screenX - screenWidth / 2,
-      screenY - screenHeight / 2,
-      screenWidth,
-      screenHeight
-    );
-    
-    // Draw selection outline with purple glow effect
-    if (engineState.selectedObject?.id === obj.id) {
-      // Purple glow effect
-      ctx.shadowColor = '#8b5cf6';
-      ctx.shadowBlur = 15;
-      ctx.strokeStyle = '#8b5cf6';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(
-        screenX - screenWidth / 2 - 2,
-        screenY - screenHeight / 2 - 2,
-        screenWidth + 4,
-        screenHeight + 4
+    if (obj.texture) {
+      // Draw texture if available
+      const img = new Image();
+      img.src = obj.texture;
+      if (img.complete) {
+        ctx.drawImage(
+          img,
+          screenX - screenWidth / 2,
+          screenY - screenHeight / 2,
+          screenWidth,
+          screenHeight
+        );
+      }
+    } else {
+      // Draw solid color
+      ctx.fillStyle = obj.color;
+      ctx.fillRect(
+        screenX - screenWidth / 2,
+        screenY - screenHeight / 2,
+        screenWidth,
+        screenHeight
       );
-      ctx.shadowBlur = 0;
+    }
+    
+    // Draw selection outline with soft purple glow
+    if (engineState.selectedObject?.id === obj.id) {
+      ctx.save();
+      
+      // Outer glow
+      ctx.shadowColor = '#8b5cf6';
+      ctx.shadowBlur = 20;
+      ctx.strokeStyle = '#8b5cf6';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6;
+      
+      // Draw multiple layers for soft glow effect
+      for (let i = 0; i < 3; i++) {
+        ctx.strokeRect(
+          screenX - screenWidth / 2 - (i * 2),
+          screenY - screenHeight / 2 - (i * 2),
+          screenWidth + (i * 4),
+          screenHeight + (i * 4)
+        );
+      }
+      
+      ctx.restore();
     }
   };
 
@@ -328,12 +354,10 @@ export const Viewport = ({
         Pan: {Math.round(engineState.panX)}, {Math.round(engineState.panY)}
       </div>
       
-      {/* Play Mode Overlay */}
+      {/* Play Mode Indicator */}
       {engineState.isPlaying && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-primary/20 text-primary px-4 py-2 rounded font-medium">
-            PLAY MODE
-          </div>
+        <div className="absolute top-4 right-4 bg-primary/20 text-primary px-3 py-1 rounded text-sm font-medium">
+          ▶ PLAYING
         </div>
       )}
     </div>

@@ -83,20 +83,10 @@ export const ComponentsDialog = ({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="bg-engine-panel border-border max-w-lg">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-foreground">
-              <Plus className="w-5 h-5 text-primary" />
-              Adicionar Componente
-            </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
+          <DialogTitle className="flex items-center gap-2 text-foreground">
+            <Plus className="w-5 h-5 text-primary" />
+            Adicionar Componente
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
