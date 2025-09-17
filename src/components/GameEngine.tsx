@@ -131,7 +131,7 @@ export const GameEngine = () => {
       
       {/* Play Mode Toolbar - minimal */}
       {engineState.isPlaying && (
-        <div className="h-16 bg-engine-toolbar border-b border-border flex items-center justify-between px-4">
+        <div className="h-16 bg-engine-toolbar border-b border-border flex items-center px-4">
           <button
             onClick={handlePlay}
             className="bg-engine-panel hover:bg-engine-panel-hover rounded p-2 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"

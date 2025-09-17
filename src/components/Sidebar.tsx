@@ -146,12 +146,12 @@ export const Sidebar = ({
   return (
     <div className="w-80 bg-engine-panel border-r border-border flex flex-col">
       {/* Tab Navigation */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border bg-engine-panel">
         <Button
           variant="ghost"
           className={cn(
-            "flex-1 rounded-none border-b-2 border-transparent",
-            activeTab === 'objects' && "border-primary bg-primary/5"
+            "flex-1 rounded-none border-b-2 border-transparent h-12 bg-transparent hover:bg-transparent",
+            activeTab === 'objects' && "border-b-primary"
           )}
           onClick={() => setActiveTab('objects')}
         >
@@ -160,8 +160,8 @@ export const Sidebar = ({
         <Button
           variant="ghost"
           className={cn(
-            "flex-1 rounded-none border-b-2 border-transparent",
-            activeTab === 'properties' && "border-primary bg-primary/5"
+            "flex-1 rounded-none border-b-2 border-transparent h-12 bg-transparent hover:bg-transparent",
+            activeTab === 'properties' && "border-b-primary"
           )}
           onClick={() => setActiveTab('properties')}
         >
@@ -239,6 +239,15 @@ export const Sidebar = ({
           <div className="p-4">
             {selectedObject ? (
               <div className="space-y-4">
+                {/* Add Components Button - At Top */}
+                <Button
+                  onClick={() => setShowComponentsDialog(true)}
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Componentes
+                </Button>
+
                 {/* Object Name */}
                 <div>
                   <Label htmlFor="name" className="text-sm font-medium mb-2 block">
@@ -321,24 +330,19 @@ export const Sidebar = ({
                         <Maximize2 className="w-3 h-3" />
                         Escala
                       </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          type="number"
-                          value={selectedObject.scale?.x || 1}
-                          onChange={(e) => handleTransformChange('scaleX', parseFloat(e.target.value) || 1)}
-                          className="bg-engine-panel border-border text-sm"
-                          step="0.1"
-                          min="0.1"
-                        />
-                        <Input
-                          type="number"
-                          value={selectedObject.scale?.y || 1}
-                          onChange={(e) => handleTransformChange('scaleY', parseFloat(e.target.value) || 1)}
-                          className="bg-engine-panel border-border text-sm"
-                          step="0.1"
-                          min="0.1"
-                        />
-                      </div>
+                      <Input
+                        type="number"
+                        value={selectedObject.scale?.x || 1}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 1;
+                          handleTransformChange('scaleX', value);
+                          handleTransformChange('scaleY', value);
+                        }}
+                        className="bg-engine-panel border-border text-sm"
+                        step="0.1"
+                        min="0.1"
+                        placeholder="Escala uniforme"
+                      />
                     </div>
 
                     {/* Rotation */}
@@ -620,20 +624,6 @@ export const Sidebar = ({
           </div>
         )}
       </ScrollArea>
-
-      {/* Add Component Button - Fixed at bottom when object is selected */}
-      {activeTab === 'properties' && selectedObject && (
-        <div className="p-4 border-t border-border bg-engine-panel">
-          <Button
-            onClick={() => setShowComponentsDialog(true)}
-            variant="outline"
-            className="w-full justify-start bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Component
-          </Button>
-        </div>
-      )}
 
       {/* Components Dialog */}
       <ComponentsDialog

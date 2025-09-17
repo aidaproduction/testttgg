@@ -46,6 +46,17 @@ export const Viewport = ({
 
   // Grid size
   const GRID_SIZE = 32;
+  
+  // Gizmo state
+  const [gizmoMode, setGizmoMode] = useState<'move' | 'rotate' | 'scale'>('move');
+  const [gizmoInteraction, setGizmoInteraction] = useState<{
+    active: boolean;
+    mode: 'rotate' | 'scale';
+    startAngle?: number;
+    startDistance?: number;
+    startScale?: number;
+    startRotation?: number;
+  }>({ active: false, mode: 'rotate' });
 
   // Get touch distance for pinch zoom
   const getTouchDistance = (touches: TouchList) => {
@@ -205,10 +216,10 @@ export const Viewport = ({
 
   // Draw functions
   const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    if (!engineState.showGrid) return;
+    if (!engineState.showGrid || engineState.isPlaying) return;
     
-    ctx.strokeStyle = 'hsl(220, 10%, 25%)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'hsl(220, 10%, 20%)';
+    ctx.lineWidth = 0.5;
     
     const startX = Math.floor((-engineState.panX - width / 2 / engineState.zoom) / GRID_SIZE) * GRID_SIZE;
     const endX = Math.ceil((-engineState.panX + width / 2 / engineState.zoom) / GRID_SIZE) * GRID_SIZE;
@@ -228,6 +239,42 @@ export const Viewport = ({
       ctx.lineTo(width, screenY);
     }
     ctx.stroke();
+  };
+
+  // Draw gizmos for selected object
+  const drawGizmos = (ctx: CanvasRenderingContext2D, obj: GameObject, screenX: number, screenY: number, screenWidth: number, screenHeight: number) => {
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    
+    // Rotation gizmo (circle around object)
+    const radius = Math.max(screenWidth, screenHeight) / 2 + 20;
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, radius, 0, 2 * Math.PI);
+    ctx.stroke();
+    
+    // Rotation handle
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.arc(screenX + radius, screenY, 6, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // Scale gizmos (corners)
+    const cornerSize = 8;
+    const corners = [
+      { x: screenX - screenWidth / 2 - cornerSize / 2, y: screenY - screenHeight / 2 - cornerSize / 2 }, // Top-left
+      { x: screenX + screenWidth / 2 - cornerSize / 2, y: screenY - screenHeight / 2 - cornerSize / 2 }, // Top-right
+      { x: screenX - screenWidth / 2 - cornerSize / 2, y: screenY + screenHeight / 2 - cornerSize / 2 }, // Bottom-left
+      { x: screenX + screenWidth / 2 - cornerSize / 2, y: screenY + screenHeight / 2 - cornerSize / 2 }, // Bottom-right
+    ];
+    
+    ctx.fillStyle = '#10b981';
+    corners.forEach(corner => {
+      ctx.fillRect(corner.x, corner.y, cornerSize, cornerSize);
+    });
+    
+    ctx.restore();
   };
 
   const drawObject = (ctx: CanvasRenderingContext2D, obj: GameObject, width: number, height: number) => {
@@ -253,6 +300,8 @@ export const Viewport = ({
       const img = new Image();
       img.src = obj.texture;
       if (img.complete) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = obj.imageQuality && obj.imageQuality < 50 ? 'low' : 'high';
         ctx.drawImage(
           img,
           screenX - screenWidth / 2,
@@ -274,25 +323,35 @@ export const Viewport = ({
     
     ctx.restore();
     
-    // Draw selection outline with soft purple glow (simpler version)
+    // Draw selection outline with soft purple glow that rotates with object
     if (engineState.selectedObject?.id === obj.id && !engineState.isPlaying) {
       ctx.save();
       
-      // Simple purple glow effect
+      // Apply same rotation for selection effect
+      if (obj.rotation) {
+        ctx.translate(screenX, screenY);
+        ctx.rotate((obj.rotation * Math.PI) / 180);
+        ctx.translate(-screenX, -screenY);
+      }
+      
+      // Soft transparent purple glow
       ctx.shadowColor = '#8b5cf6';
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 12;
       ctx.strokeStyle = '#8b5cf6';
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.4;
       
       ctx.strokeRect(
-        screenX - screenWidth / 2 - 2,
-        screenY - screenHeight / 2 - 2,
-        screenWidth + 4,
-        screenHeight + 4
+        screenX - screenWidth / 2 - 3,
+        screenY - screenHeight / 2 - 3,
+        screenWidth + 6,
+        screenHeight + 6
       );
       
       ctx.restore();
+      
+      // Draw gizmos (without rotation)
+      drawGizmos(ctx, obj, screenX, screenY, screenWidth, screenHeight);
     }
   };
 
@@ -314,7 +373,7 @@ export const Viewport = ({
     // Draw grid
     drawGrid(ctx, width, height);
     
-  // Draw objects sorted by zIndex
+    // Draw objects sorted by zIndex
     const sortedObjects = [...engineState.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
     sortedObjects.forEach(obj => {
       drawObject(ctx, obj, width, height);
