@@ -47,16 +47,16 @@ export const Viewport = ({
   // Grid size
   const GRID_SIZE = 32;
   
-  // Gizmo state
-  const [gizmoMode, setGizmoMode] = useState<'move' | 'rotate' | 'scale'>('move');
-  const [gizmoInteraction, setGizmoInteraction] = useState<{
-    active: boolean;
-    mode: 'rotate' | 'scale';
-    startAngle?: number;
-    startDistance?: number;
-    startScale?: number;
-    startRotation?: number;
-  }>({ active: false, mode: 'rotate' });
+  // Touch interaction state for rotation and scaling
+  const [touchInteraction, setTouchInteraction] = useState<{
+    mode: 'move' | 'rotate' | 'scale' | null;
+    startX: number;
+    startY: number;
+    startRotation: number;
+    startScale: number;
+    centerX: number;
+    centerY: number;
+  } | null>(null);
 
   // Get touch distance for pinch zoom
   const getTouchDistance = (touches: TouchList) => {
@@ -125,15 +125,53 @@ export const Viewport = ({
           setDraggedObject(null);
         }
       } else {
-        // Single tap - start potential drag
+        // Single tap - check if we're interacting with selected object
         if (hitObject && hitObject === engineState.selectedObject) {
-          setDraggedObject(hitObject);
-          setDragOffset({
-            x: worldPos.x - hitObject.x,
-            y: worldPos.y - hitObject.y
-          });
+          // Determine interaction mode based on touch position relative to object center
+          const objCenterX = hitObject.x;
+          const objCenterY = hitObject.y;
+          const distanceFromCenter = Math.sqrt(
+            Math.pow(worldPos.x - objCenterX, 2) + Math.pow(worldPos.y - objCenterY, 2)
+          );
+          const objRadius = Math.max(hitObject.width, hitObject.height) / 2;
+          
+          if (distanceFromCenter > objRadius * 0.7) {
+            // Outer area - rotation mode
+            setTouchInteraction({
+              mode: 'rotate',
+              startX: worldPos.x,
+              startY: worldPos.y,
+              startRotation: hitObject.rotation || 0,
+              startScale: hitObject.scale?.x || 1,
+              centerX: objCenterX,
+              centerY: objCenterY
+            });
+          } else if (distanceFromCenter > objRadius * 0.3) {
+            // Middle area - scale mode
+            setTouchInteraction({
+              mode: 'scale',
+              startX: worldPos.x,
+              startY: worldPos.y,
+              startRotation: hitObject.rotation || 0,
+              startScale: hitObject.scale?.x || 1,
+              centerX: objCenterX,
+              centerY: objCenterY
+            });
+          } else {
+            // Inner area - move mode
+            setTouchInteraction(null);
+            setDraggedObject(hitObject);
+            setDragOffset({
+              x: worldPos.x - hitObject.x,
+              y: worldPos.y - hitObject.y
+            });
+          }
+        } else if (hitObject) {
+          // Select different object
+          onObjectSelect(hitObject);
         } else {
           // Start panning
+          onObjectSelect(null);
           touchState.current.panStartX = engineState.panX;
           touchState.current.panStartY = engineState.panY;
           touchState.current.dragStartX = touch.clientX;
@@ -150,7 +188,7 @@ export const Viewport = ({
     
     touchState.current.lastTouchTime = now;
     touchState.current.lastTouchCount = touches.length;
-  }, [engineState, onObjectSelect]);
+  }, [engineState, onObjectSelect, touchInteraction]);
 
   // Handle touch move
   const handleTouchMove = useCallback((e: TouchEvent) => {
@@ -165,7 +203,43 @@ export const Viewport = ({
       const touch = touches[0];
       const worldPos = screenToWorld(touch.clientX, touch.clientY);
       
-      if (draggedObject) {
+      if (touchInteraction && touchInteraction.mode === 'rotate' && engineState.selectedObject) {
+        // Handle rotation
+        const angle = Math.atan2(
+          worldPos.y - touchInteraction.centerY,
+          worldPos.x - touchInteraction.centerX
+        );
+        const startAngle = Math.atan2(
+          touchInteraction.startY - touchInteraction.centerY,
+          touchInteraction.startX - touchInteraction.centerX
+        );
+        const deltaAngle = (angle - startAngle) * (180 / Math.PI);
+        const newRotation = touchInteraction.startRotation + deltaAngle;
+        
+        const updatedObject = { ...engineState.selectedObject, rotation: newRotation };
+        onObjectUpdate(updatedObject);
+      } else if (touchInteraction && touchInteraction.mode === 'scale' && engineState.selectedObject) {
+        // Handle scaling
+        const currentDistance = Math.sqrt(
+          Math.pow(worldPos.x - touchInteraction.centerX, 2) + 
+          Math.pow(worldPos.y - touchInteraction.centerY, 2)
+        );
+        const startDistance = Math.sqrt(
+          Math.pow(touchInteraction.startX - touchInteraction.centerX, 2) + 
+          Math.pow(touchInteraction.startY - touchInteraction.centerY, 2)
+        );
+        
+        if (startDistance > 0) {
+          const scaleMultiplier = currentDistance / startDistance;
+          const newScale = Math.max(0.1, touchInteraction.startScale * scaleMultiplier);
+          
+          const updatedObject = { 
+            ...engineState.selectedObject, 
+            scale: { x: newScale, y: newScale }
+          };
+          onObjectUpdate(updatedObject);
+        }
+      } else if (draggedObject) {
         // Drag selected object
         const newX = worldPos.x - dragOffset.x;
         const newY = worldPos.y - dragOffset.y;
@@ -200,7 +274,7 @@ export const Viewport = ({
       
       onViewportChange({ zoom: newZoom });
     }
-  }, [draggedObject, dragOffset, engineState, onObjectUpdate, onViewportChange]);
+  }, [touchInteraction, draggedObject, dragOffset, engineState, onObjectUpdate, onViewportChange]);
 
   // Handle touch end
   const handleTouchEnd = useCallback((e: TouchEvent) => {
@@ -212,7 +286,8 @@ export const Viewport = ({
     touchState.current.isDragging = false;
     touchState.current.initialPinchDistance = null;
     setDraggedObject(null);
-  }, []);
+    setTouchInteraction(null);
+  }, [engineState.isPlaying]);
 
   // Draw functions
   const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
@@ -241,41 +316,6 @@ export const Viewport = ({
     ctx.stroke();
   };
 
-  // Draw gizmos for selected object
-  const drawGizmos = (ctx: CanvasRenderingContext2D, obj: GameObject, screenX: number, screenY: number, screenWidth: number, screenHeight: number) => {
-    ctx.save();
-    ctx.globalAlpha = 0.8;
-    
-    // Rotation gizmo (circle around object)
-    const radius = Math.max(screenWidth, screenHeight) / 2 + 20;
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, radius, 0, 2 * Math.PI);
-    ctx.stroke();
-    
-    // Rotation handle
-    ctx.fillStyle = '#3b82f6';
-    ctx.beginPath();
-    ctx.arc(screenX + radius, screenY, 6, 0, 2 * Math.PI);
-    ctx.fill();
-    
-    // Scale gizmos (corners)
-    const cornerSize = 8;
-    const corners = [
-      { x: screenX - screenWidth / 2 - cornerSize / 2, y: screenY - screenHeight / 2 - cornerSize / 2 }, // Top-left
-      { x: screenX + screenWidth / 2 - cornerSize / 2, y: screenY - screenHeight / 2 - cornerSize / 2 }, // Top-right
-      { x: screenX - screenWidth / 2 - cornerSize / 2, y: screenY + screenHeight / 2 - cornerSize / 2 }, // Bottom-left
-      { x: screenX + screenWidth / 2 - cornerSize / 2, y: screenY + screenHeight / 2 - cornerSize / 2 }, // Bottom-right
-    ];
-    
-    ctx.fillStyle = '#10b981';
-    corners.forEach(corner => {
-      ctx.fillRect(corner.x, corner.y, cornerSize, cornerSize);
-    });
-    
-    ctx.restore();
-  };
 
   const drawObject = (ctx: CanvasRenderingContext2D, obj: GameObject, width: number, height: number) => {
     if (!obj.visible) return; // Don't draw invisible objects
@@ -334,12 +374,12 @@ export const Viewport = ({
         ctx.translate(-screenX, -screenY);
       }
       
-      // Soft transparent purple glow
+      // Very soft transparent purple glow - matching reference image
       ctx.shadowColor = '#8b5cf6';
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 8;
       ctx.strokeStyle = '#8b5cf6';
       ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.4;
+      ctx.globalAlpha = 0.15;
       
       ctx.strokeRect(
         screenX - screenWidth / 2 - 3,
@@ -349,9 +389,6 @@ export const Viewport = ({
       );
       
       ctx.restore();
-      
-      // Draw gizmos (without rotation)
-      drawGizmos(ctx, obj, screenX, screenY, screenWidth, screenHeight);
     }
   };
 

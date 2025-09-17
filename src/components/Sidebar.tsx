@@ -170,74 +170,75 @@ export const Sidebar = ({
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1">
-        {activeTab === 'objects' ? (
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary"></div>
-                <div className="w-2 h-2 rounded-full bg-muted"></div>
+      <ScrollArea className="flex-1 h-0">
+        <div className="h-full">
+          {activeTab === 'objects' ? (
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary"></div>
+                  <div className="w-2 h-2 rounded-full bg-muted"></div>
+                </div>
               </div>
+              
+              {objects.length === 0 ? (
+                <div className="text-center py-12">
+                  <Box className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground mb-2">Nenhum objeto</p>
+                  <p className="text-sm text-muted-foreground">
+                    Clique em "+ Sprite" para começar
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {objects.map((object) => (
+                    <Card
+                      key={object.id}
+                      className={cn(
+                        "p-2 cursor-pointer bg-engine-panel hover:bg-engine-panel-hover border-border transition-colors",
+                        selectedObject?.id === object.id && "ring-2 ring-primary border-primary"
+                      )}
+                      onClick={() => onObjectSelect(object)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Box className="w-3 h-3 text-primary" />
+                          <span className="text-xs font-medium">{object.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updatedObject = { ...object, visible: !object.visible };
+                              onObjectUpdate(updatedObject);
+                            }}
+                          >
+                            {object.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onObjectDelete(object.id);
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
-            
-            {objects.length === 0 ? (
-              <div className="text-center py-12">
-                <Box className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-2">Nenhum objeto</p>
-                <p className="text-sm text-muted-foreground">
-                  Clique em "+ Sprite" para começar
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {objects.map((object) => (
-                  <Card
-                    key={object.id}
-                    className={cn(
-                      "p-2 cursor-pointer bg-engine-panel hover:bg-engine-panel-hover border-border transition-colors",
-                      selectedObject?.id === object.id && "ring-2 ring-primary border-primary"
-                    )}
-                    onClick={() => onObjectSelect(object)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Box className="w-3 h-3 text-primary" />
-                        <span className="text-xs font-medium">{object.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const updatedObject = { ...object, visible: !object.visible };
-                            onObjectUpdate(updatedObject);
-                          }}
-                        >
-                          {object.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onObjectDelete(object.id);
-                          }}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="p-4">
-            {selectedObject ? (
+          ) : (
+            <div className="p-4 pb-20">
+              {selectedObject ? (
               <div className="space-y-4">
                 {/* Add Components Button - At Top */}
                 <Button
@@ -623,6 +624,7 @@ export const Sidebar = ({
             )}
           </div>
         )}
+        </div>
       </ScrollArea>
 
       {/* Components Dialog */}
