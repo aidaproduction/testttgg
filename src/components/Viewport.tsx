@@ -139,6 +139,8 @@ export const Viewport = ({
                 startX: worldPos.x,
                 startY: worldPos.y,
                 startRotation: hitObject.rotation || 0,
+                startScaleX: hitObject.scale?.x ?? 1,
+                startScaleY: hitObject.scale?.y ?? 1,
                 centerX: hitObject.x,
                 centerY: hitObject.y
               });
