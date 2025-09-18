@@ -1,200 +1,104 @@
-import { useCallback, useRef } from 'react';
-import { GameObject, GameComponent } from '@/components/GameEngine';
+import { useRef } from 'react';
+import Matter from 'matter-js';
+import { GameObject } from '@/components/GameEngine';
 
-interface PhysicsObject extends GameObject {
-  velocity: { x: number; y: number };
-  acceleration: { x: number; y: number };
-  mass: number;
-  friction: number;
-  bounciness: number;
-  isStatic: boolean;
-}
-
-interface CollisionResult {
-  isColliding: boolean;
-  penetration?: { x: number; y: number };
-  normal?: { x: number; y: number };
+interface PhysicsObject {
+  id: string;
+  x: number;
+  y: number;
+  body: Matter.Body;
 }
 
 export const usePhysics = () => {
-  const physicsObjects = useRef<Map<string, PhysicsObject>>(new Map());
-  const lastTime = useRef<number>(Date.now());
+  const engine = useRef<Matter.Engine | null>(null);
+  const physicsObjects = useRef<PhysicsObject[]>([]);
 
-  // Optimized AABB collision detection
-  const checkCollision = useCallback((obj1: PhysicsObject, obj2: PhysicsObject): CollisionResult => {
-    const left1 = obj1.x;
-    const right1 = obj1.x + obj1.width * (obj1.scale?.x || 1);
-    const top1 = obj1.y;
-    const bottom1 = obj1.y + obj1.height * (obj1.scale?.y || 1);
-
-    const left2 = obj2.x;
-    const right2 = obj2.x + obj2.width * (obj2.scale?.x || 1);
-    const top2 = obj2.y;
-    const bottom2 = obj2.y + obj2.height * (obj2.scale?.y || 1);
-
-    const isColliding = !(right1 < left2 || left1 > right2 || bottom1 < top2 || top1 > bottom2);
-
-    if (!isColliding) {
-      return { isColliding: false };
+  const reset = () => {
+    if (engine.current) {
+      Matter.World.clear(engine.current.world, false);
+      Matter.Engine.clear(engine.current);
     }
-
-    // Calculate penetration and normal for collision resolution
-    const overlapX = Math.min(right1 - left2, right2 - left1);
-    const overlapY = Math.min(bottom1 - top2, bottom2 - top1);
-
-    let normal = { x: 0, y: 0 };
-    let penetration = { x: 0, y: 0 };
-
-    if (overlapX < overlapY) {
-      normal.x = left1 < left2 ? -1 : 1;
-      penetration.x = overlapX * normal.x;
-    } else {
-      normal.y = top1 < top2 ? -1 : 1;
-      penetration.y = overlapY * normal.y;
-    }
-
-    return { isColliding: true, penetration, normal };
-  }, []);
-
-  // Resolve collision with impulse-based method (optimized for mobile)
-  const resolveCollision = useCallback((obj1: PhysicsObject, obj2: PhysicsObject, collision: CollisionResult) => {
-    if (!collision.penetration || !collision.normal) return;
-
-    const { penetration, normal } = collision;
-
-    // Separate objects
-    if (!obj1.isStatic && !obj2.isStatic) {
-      obj1.x -= penetration.x * 0.5;
-      obj1.y -= penetration.y * 0.5;
-      obj2.x += penetration.x * 0.5;
-      obj2.y += penetration.y * 0.5;
-    } else if (!obj1.isStatic) {
-      obj1.x -= penetration.x;
-      obj1.y -= penetration.y;
-    } else if (!obj2.isStatic) {
-      obj2.x += penetration.x;
-      obj2.y += penetration.y;
-    }
-
-    // Calculate relative velocity
-    const relativeVelocity = {
-      x: obj1.velocity.x - obj2.velocity.x,
-      y: obj1.velocity.y - obj2.velocity.y
-    };
-
-    // Relative velocity along normal
-    const velocityAlongNormal = relativeVelocity.x * normal.x + relativeVelocity.y * normal.y;
-
-    // Don't resolve if velocities are separating
-    if (velocityAlongNormal > 0) return;
-
-    // Calculate restitution (bounciness)
-    const restitution = Math.min(obj1.bounciness, obj2.bounciness);
-
-    // Calculate impulse scalar
-    let impulseScalar = -(1 + restitution) * velocityAlongNormal;
-    impulseScalar /= (1 / obj1.mass) + (1 / obj2.mass);
-
-    // Apply impulse
-    const impulse = {
-      x: impulseScalar * normal.x,
-      y: impulseScalar * normal.y
-    };
-
-    if (!obj1.isStatic) {
-      obj1.velocity.x += impulse.x / obj1.mass;
-      obj1.velocity.y += impulse.y / obj1.mass;
-    }
-
-    if (!obj2.isStatic) {
-      obj2.velocity.x -= impulse.x / obj2.mass;
-      obj2.velocity.y -= impulse.y / obj2.mass;
-    }
-  }, []);
-
-  const addPhysicsObject = useCallback((object: GameObject, components: GameComponent[]) => {
-    const hasRigidbody = components.some(c => c.type === 'rigidbody' && c.enabled);
     
-    if (hasRigidbody) {
-      const physicsObj: PhysicsObject = {
-        ...object,
-        velocity: { x: 0, y: 0 },
-        acceleration: { x: 0, y: 200 }, // gravity
-        mass: 1,
-        friction: 0.8,
-        bounciness: 0.3,
-        isStatic: false
+    // Create new engine
+    engine.current = Matter.Engine.create();
+    engine.current.world.gravity.y = 1; // Real gravity
+    engine.current.world.gravity.x = 0;
+    
+    physicsObjects.current = [];
+    
+    // Add ground
+    const ground = Matter.Bodies.rectangle(0, 400, 2000, 60, { 
+      isStatic: true,
+      render: { fillStyle: 'transparent' }
+    });
+    Matter.World.add(engine.current.world, ground);
+    
+    // Add side walls
+    const leftWall = Matter.Bodies.rectangle(-500, 0, 60, 1000, { isStatic: true });
+    const rightWall = Matter.Bodies.rectangle(500, 0, 60, 1000, { isStatic: true });
+    Matter.World.add(engine.current.world, [leftWall, rightWall]);
+  };
+
+  const addPhysicsObject = (gameObject: GameObject, components: any[]) => {
+    if (!engine.current) return;
+
+    const rigidbody = components.find(c => c.type === 'rigidbody' && c.enabled);
+    const collider = components.find(c => c.type === 'boxCollider' && c.enabled);
+
+    if (rigidbody && collider) {
+      // Create physics body
+      const body = Matter.Bodies.rectangle(
+        gameObject.x, 
+        gameObject.y, 
+        gameObject.width * (gameObject.scale?.x || 1), 
+        gameObject.height * (gameObject.scale?.y || 1),
+        {
+          mass: rigidbody.properties?.mass || 1,
+          frictionAir: rigidbody.properties?.drag || 0.01,
+          restitution: 0.6, // Bounce
+          friction: 0.8,
+          render: { fillStyle: 'transparent' }
+        }
+      );
+
+      // Set initial velocity if object was moving
+      if (rigidbody.properties?.gravityScale !== undefined && rigidbody.properties.gravityScale === 0) {
+        body.isStatic = true;
+      }
+
+      Matter.World.add(engine.current.world, body);
+      
+      const physicsObject: PhysicsObject = {
+        id: gameObject.id,
+        x: gameObject.x,
+        y: gameObject.y,
+        body
       };
       
-      physicsObjects.current.set(object.id, physicsObj);
+      physicsObjects.current.push(physicsObject);
     }
-  }, []);
+  };
 
-  const removePhysicsObject = useCallback((objectId: string) => {
-    physicsObjects.current.delete(objectId);
-  }, []);
+  const step = () => {
+    if (!engine.current) return physicsObjects.current;
 
-  const updatePhysics = useCallback((deltaTime: number) => {
-    const objects = Array.from(physicsObjects.current.values());
-    
-    // Update positions and velocities
-    for (const obj of objects) {
-      if (obj.isStatic) continue;
+    // Run physics engine
+    Matter.Engine.update(engine.current, 16.67); // ~60fps
 
-      // Apply acceleration (gravity, forces)
-      obj.velocity.x += obj.acceleration.x * deltaTime;
-      obj.velocity.y += obj.acceleration.y * deltaTime;
-
-      // Apply friction
-      obj.velocity.x *= Math.pow(obj.friction, deltaTime);
-      obj.velocity.y *= Math.pow(obj.friction, deltaTime);
-
-      // Update position
-      obj.x += obj.velocity.x * deltaTime;
-      obj.y += obj.velocity.y * deltaTime;
-
-      // Screen bounds (simple boundary)
-      if (obj.x < 0) {
-        obj.x = 0;
-        obj.velocity.x = Math.abs(obj.velocity.x) * obj.bounciness;
+    // Update positions from physics bodies
+    physicsObjects.current.forEach(obj => {
+      if (obj.body) {
+        obj.x = obj.body.position.x;
+        obj.y = obj.body.position.y;
       }
-      if (obj.y < 0) {
-        obj.y = 0;
-        obj.velocity.y = Math.abs(obj.velocity.y) * obj.bounciness;
-      }
-    }
+    });
 
-    // Check collisions between all objects with box colliders
-    for (let i = 0; i < objects.length; i++) {
-      for (let j = i + 1; j < objects.length; j++) {
-        const collision = checkCollision(objects[i], objects[j]);
-        if (collision.isColliding) {
-          resolveCollision(objects[i], objects[j], collision);
-        }
-      }
-    }
-
-    return objects;
-  }, [checkCollision, resolveCollision]);
-
-  const step = useCallback(() => {
-    const currentTime = Date.now();
-    const deltaTime = Math.min((currentTime - lastTime.current) / 1000, 1/30); // Cap at 30fps minimum
-    lastTime.current = currentTime;
-
-    return updatePhysics(deltaTime);
-  }, [updatePhysics]);
-
-  const reset = useCallback(() => {
-    physicsObjects.current.clear();
-    lastTime.current = Date.now();
-  }, []);
+    return physicsObjects.current;
+  };
 
   return {
-    addPhysicsObject,
-    removePhysicsObject,
-    step,
     reset,
-    getPhysicsObjects: () => Array.from(physicsObjects.current.values())
+    addPhysicsObject,
+    step
   };
 };

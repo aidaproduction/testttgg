@@ -45,7 +45,7 @@ export const SpriteDialog = ({ open, onClose, onSpriteCreate }: SpriteDialogProp
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="bg-engine-panel border-border max-w-md">
+      <DialogContent className="bg-engine-panel border-border max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <Sparkles className="w-5 h-5 text-primary" />
@@ -65,7 +65,8 @@ export const SpriteDialog = ({ open, onClose, onSpriteCreate }: SpriteDialogProp
               onChange={(e) => setSpriteName(e.target.value)}
               placeholder="Ex: Player, Inimigo, Moeda..."
               className="bg-engine-toolbar border-border"
-              autoFocus
+              autoComplete="off"
+              inputMode="none"
             />
           </div>
 

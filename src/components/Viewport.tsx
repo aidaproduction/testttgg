@@ -20,6 +20,8 @@ interface TouchState {
   initialZoom: number;
   panStartX: number;
   panStartY: number;
+  lastTapTime: number;
+  lastTapTarget: GameObject | null;
 }
 
 export const Viewport = ({
@@ -41,6 +43,8 @@ export const Viewport = ({
     initialZoom: 1,
     panStartX: 0,
     panStartY: 0,
+    lastTapTime: 0,
+    lastTapTarget: null,
   });
 
   const [draggedObject, setDraggedObject] = useState<GameObject | null>(null);
@@ -112,58 +116,68 @@ export const Viewport = ({
       const worldPos = screenToWorld(touch.clientX, touch.clientY);
       const hitObject = getObjectAtPosition(worldPos.x, worldPos.y);
       
-      // Single tap - select object or interact with selected
+      // Double tap detection
       if (hitObject) {
-        onObjectSelect(hitObject);
+        const isDoubleTap = now - touchState.current.lastTapTime < 300 && 
+                          touchState.current.lastTapTarget?.id === hitObject.id;
         
-        // Determine interaction mode based on selected tool and object area
-        if (hitObject === engineState.selectedObject) {
-          const objCenterX = hitObject.x;
-          const objCenterY = hitObject.y;
-          const distanceFromCenter = Math.sqrt(
-            Math.pow(worldPos.x - objCenterX, 2) + Math.pow(worldPos.y - objCenterY, 2)
-          );
-          const objRadius = Math.max(hitObject.width, hitObject.height) / 2;
-          
-          if (engineState.selectedTool === 'rotate') {
-            // Rotation mode - outer area
-            setTouchInteraction({
-              mode: 'rotate',
-              startX: worldPos.x,
-              startY: worldPos.y,
-              startRotation: hitObject.rotation || 0,
-              startScale: hitObject.scale?.x || 1,
-              centerX: objCenterX,
-              centerY: objCenterY
-            });
-          } else if (engineState.selectedTool === 'scale') {
-            // Scale mode - middle area
-            setTouchInteraction({
-              mode: 'scale',
-              startX: worldPos.x,
-              startY: worldPos.y,
-              startRotation: hitObject.rotation || 0,
-              startScale: hitObject.scale?.x || 1,
-              centerX: objCenterX,
-              centerY: objCenterY
-            });
-          } else {
-            // Move mode (default)
-            setTouchInteraction(null);
-            setDraggedObject(hitObject);
-            setDragOffset({
-              x: worldPos.x - hitObject.x,
-              y: worldPos.y - hitObject.y
-            });
+        if (isDoubleTap) {
+          // Double tap on object - select it
+          onObjectSelect(hitObject);
+          touchState.current.lastTapTime = 0; // Reset to avoid triple tap
+        } else {
+          // Single tap - prepare for possible double tap, start interaction if already selected
+          if (hitObject === engineState.selectedObject) {
+            // Already selected object - start interaction based on tool
+            if (engineState.selectedTool === 'rotate') {
+              setTouchInteraction({
+                mode: 'rotate',
+                startX: worldPos.x,
+                startY: worldPos.y,
+                startRotation: hitObject.rotation || 0,
+                startScale: hitObject.scale?.x || 1,
+                centerX: hitObject.x,
+                centerY: hitObject.y
+              });
+            } else if (engineState.selectedTool === 'scale') {
+              setTouchInteraction({
+                mode: 'scale',
+                startX: worldPos.x,
+                startY: worldPos.y,
+                startRotation: hitObject.rotation || 0,
+                startScale: hitObject.scale?.x || 1,
+                centerX: hitObject.x,
+                centerY: hitObject.y
+              });
+            } else {
+              // Move mode (default)
+              setTouchInteraction(null);
+              setDraggedObject(hitObject);
+              setDragOffset({
+                x: worldPos.x - hitObject.x,
+                y: worldPos.y - hitObject.y
+              });
+            }
           }
+          touchState.current.lastTapTime = now;
+          touchState.current.lastTapTarget = hitObject;
         }
       } else {
-        // Start panning
-        onObjectSelect(null);
-        touchState.current.panStartX = engineState.panX;
-        touchState.current.panStartY = engineState.panY;
-        touchState.current.dragStartX = touch.clientX;
-        touchState.current.dragStartY = touch.clientY;
+        // Double tap on empty space - deselect
+        const isDoubleTap = now - touchState.current.lastTapTime < 300 && !touchState.current.lastTapTarget;
+        
+        if (isDoubleTap) {
+          onObjectSelect(null);
+          touchState.current.lastTapTime = 0;
+        } else {
+          // Single tap on empty space - prepare for possible double tap, start panning
+          touchState.current.panStartX = engineState.panX;
+          touchState.current.panStartY = engineState.panY;
+          touchState.current.dragStartX = touch.clientX;
+          touchState.current.dragStartY = touch.clientY;
+          touchState.current.lastTapTime = now;
+          touchState.current.lastTapTarget = null;
+        }
       }
       
       touchState.current.isDragging = true;
@@ -206,26 +220,31 @@ export const Viewport = ({
         const updatedObject = { ...engineState.selectedObject, rotation: newRotation };
         onObjectUpdate(updatedObject);
       } else if (touchInteraction && touchInteraction.mode === 'scale' && engineState.selectedObject) {
-        // Handle scaling - proportional scaling
-        const currentDistance = Math.sqrt(
-          Math.pow(worldPos.x - touchInteraction.centerX, 2) + 
-          Math.pow(worldPos.y - touchInteraction.centerY, 2)
-        );
-        const startDistance = Math.sqrt(
-          Math.pow(touchInteraction.startX - touchInteraction.centerX, 2) + 
-          Math.pow(touchInteraction.startY - touchInteraction.centerY, 2)
-        );
+        // Handle directional scaling - scale based on drag direction
+        const deltaX = worldPos.x - touchInteraction.startX;
+        const deltaY = worldPos.y - touchInteraction.startY;
         
-        if (startDistance > 0) {
-          const scaleMultiplier = currentDistance / startDistance;
-          const newScale = Math.max(0.1, touchInteraction.startScale * scaleMultiplier);
-          
-          const updatedObject = { 
-            ...engineState.selectedObject, 
-            scale: { x: newScale, y: newScale }
-          };
-          onObjectUpdate(updatedObject);
-        }
+        // Calculate scale change based on distance from start
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        const scaleChange = distance * 0.01; // Sensitivity factor
+        
+        // Determine if we're scaling up or down based on movement direction
+        const centerDeltaX = worldPos.x - touchInteraction.centerX;
+        const centerDeltaY = worldPos.y - touchInteraction.centerY;
+        const startCenterDeltaX = touchInteraction.startX - touchInteraction.centerX;
+        const startCenterDeltaY = touchInteraction.startY - touchInteraction.centerY;
+        
+        const currentDistanceFromCenter = Math.sqrt(centerDeltaX * centerDeltaX + centerDeltaY * centerDeltaY);
+        const startDistanceFromCenter = Math.sqrt(startCenterDeltaX * startCenterDeltaX + startCenterDeltaY * startCenterDeltaY);
+        
+        const scaleDirection = currentDistanceFromCenter > startDistanceFromCenter ? 1 : -1;
+        const newScale = Math.max(0.1, Math.min(5, touchInteraction.startScale + (scaleChange * scaleDirection)));
+        
+        const updatedObject = { 
+          ...engineState.selectedObject, 
+          scale: { x: newScale, y: newScale }
+        };
+        onObjectUpdate(updatedObject);
       } else if (draggedObject) {
         // Drag selected object
         const newX = worldPos.x - dragOffset.x;
@@ -400,20 +419,17 @@ export const Viewport = ({
     const width = canvas.width;
     const height = canvas.height;
     
-    // Apply scene resolution scaling
-    const resolutionScale = engineState.sceneResolution / 100;
-    ctx.save();
-    ctx.scale(resolutionScale, resolutionScale);
-    
-    // Clear canvas
-    ctx.fillStyle = 'hsl(225, 12%, 8%)';
-    ctx.fillRect(0, 0, width / resolutionScale, height / resolutionScale);
-    
-    // Draw grid
-    drawGrid(ctx, width / resolutionScale, height / resolutionScale);
-    
-    // Update physics in play mode
+    // Apply scene resolution scaling only in play mode
     if (engineState.isPlaying) {
+      const resolutionScale = engineState.sceneResolution / 100;
+      ctx.save();
+      ctx.scale(resolutionScale, resolutionScale);
+      
+      // Clear canvas
+      ctx.fillStyle = 'hsl(225, 12%, 8%)';
+      ctx.fillRect(0, 0, width / resolutionScale, height / resolutionScale);
+      
+      // Update physics in play mode
       const physicsObjects = physics.step();
       
       // Update object positions from physics
@@ -427,15 +443,28 @@ export const Viewport = ({
           });
         }
       });
+      
+      // Draw objects sorted by zIndex
+      const sortedObjects = [...engineState.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+      sortedObjects.forEach(obj => {
+        drawObject(ctx, obj, width / resolutionScale, height / resolutionScale);
+      });
+      
+      ctx.restore();
+    } else {
+      // Editor mode - no resolution scaling
+      ctx.fillStyle = 'hsl(225, 12%, 8%)';
+      ctx.fillRect(0, 0, width, height);
+      
+      // Draw grid
+      drawGrid(ctx, width, height);
+      
+      // Draw objects sorted by zIndex
+      const sortedObjects = [...engineState.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+      sortedObjects.forEach(obj => {
+        drawObject(ctx, obj, width, height);
+      });
     }
-    
-    // Draw objects sorted by zIndex
-    const sortedObjects = [...engineState.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-    sortedObjects.forEach(obj => {
-      drawObject(ctx, obj, width / resolutionScale, height / resolutionScale);
-    });
-    
-    ctx.restore();
   }, [engineState, physics, onObjectUpdate]);
 
   // Setup canvas and event listeners
@@ -492,12 +521,6 @@ export const Viewport = ({
         </div>
       )}
       
-      {/* Play Mode Indicator */}
-      {engineState.isPlaying && (
-        <div className="absolute top-4 right-4 bg-primary/20 text-primary px-3 py-1 rounded text-sm font-medium">
-          ▶ PLAYING
-        </div>
-      )}
     </div>
   );
 };

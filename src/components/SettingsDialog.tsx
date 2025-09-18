@@ -17,16 +17,18 @@ export const SettingsDialog = ({
   sceneResolution,
   onSceneResolutionChange
 }: SettingsDialogProps) => {
-  const [resolution, setResolution] = useState(sceneResolution);
+  const [resolution, setResolution] = useState<string | number>(sceneResolution);
 
   const handleSave = () => {
-    onSceneResolutionChange(Math.max(10, Math.min(200, resolution)));
+    // Allow any number but ensure it's positive
+    const finalResolution = Math.max(1, typeof resolution === 'string' ? 100 : resolution);
+    onSceneResolutionChange(finalResolution);
     onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-engine-panel border-border">
+      <DialogContent className="sm:max-w-md bg-engine-panel border-border" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-foreground">Configurações</DialogTitle>
         </DialogHeader>
@@ -40,15 +42,24 @@ export const SettingsDialog = ({
               id="resolution"
               type="number"
               value={resolution}
-              onChange={(e) => setResolution(parseInt(e.target.value) || 100)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  setResolution('');
+                } else {
+                  const numValue = parseInt(value);
+                  setResolution(isNaN(numValue) ? 100 : numValue);
+                }
+              }}
               className="bg-engine-toolbar border-border"
-              min="10"
-              max="200"
+              placeholder="100"
+              autoComplete="off"
+              inputMode="none"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Valores baixos: melhor performance, pior qualidade (10-50)
+              Valores baixos: pixelado (5-50) | Valores altos: nítido (100-700)
               <br />
-              Valores altos: melhor qualidade, pior performance (100-200)
+              Afeta apenas o modo de play, não o editor
             </p>
           </div>
         </div>
