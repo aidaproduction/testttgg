@@ -7,9 +7,12 @@ import {
   Plus, 
   Play, 
   Pause,
-  Home
+  Home,
+  Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export type GizmoTool = 'move' | 'rotate' | 'scale';
 
 interface ToolbarProps {
   isPlaying: boolean;
@@ -22,6 +25,9 @@ interface ToolbarProps {
   onGridPanelToggle: () => void;
   showGridPanel: boolean;
   onViewportReset: () => void;
+  selectedTool: GizmoTool;
+  onToolSelect: (tool: GizmoTool) => void;
+  onSettingsOpen: () => void;
 }
 
 export const Toolbar = ({
@@ -34,20 +40,47 @@ export const Toolbar = ({
   onSnapToggle,
   onGridPanelToggle,
   showGridPanel,
-  onViewportReset
+  onViewportReset,
+  selectedTool,
+  onToolSelect,
+  onSettingsOpen
 }: ToolbarProps) => {
   return (
     <div className="h-16 bg-engine-toolbar border-b border-border flex items-center justify-between px-4">
       {/* Left Tools */}
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1 bg-engine-panel rounded-lg p-1">
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className={cn(
+              "text-muted-foreground hover:text-foreground",
+              selectedTool === 'move' && "text-primary bg-primary/10"
+            )}
+            onClick={() => onToolSelect('move')}
+          >
             <Move className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className={cn(
+              "text-muted-foreground hover:text-foreground",
+              selectedTool === 'rotate' && "text-primary bg-primary/10"
+            )}
+            onClick={() => onToolSelect('rotate')}
+          >
             <RotateCw className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className={cn(
+              "text-muted-foreground hover:text-foreground",
+              selectedTool === 'scale' && "text-primary bg-primary/10"
+            )}
+            onClick={() => onToolSelect('scale')}
+          >
             <Maximize2 className="w-4 h-4" />
           </Button>
           <Button 
@@ -75,6 +108,16 @@ export const Toolbar = ({
 
       {/* Right Controls */}
       <div className="flex items-center gap-3">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="text-muted-foreground hover:text-foreground"
+          onClick={onSettingsOpen}
+          title="Configurações"
+        >
+          <Settings className="w-4 h-4" />
+        </Button>
+        
         <Button 
           onClick={onCreateSprite}
           className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-4"

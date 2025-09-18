@@ -325,27 +325,6 @@ export const Sidebar = ({
                       </div>
                     </div>
 
-                    {/* Scale */}
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                        <Maximize2 className="w-3 h-3" />
-                        Escala
-                      </Label>
-                      <Input
-                        type="number"
-                        value={selectedObject.scale?.x || 1}
-                        onChange={(e) => {
-                          const value = parseFloat(e.target.value) || 1;
-                          handleTransformChange('scaleX', value);
-                          handleTransformChange('scaleY', value);
-                        }}
-                        className="bg-engine-panel border-border text-sm"
-                        step="0.1"
-                        min="0.1"
-                        placeholder="Escala uniforme"
-                      />
-                    </div>
-
                     {/* Rotation */}
                     <div>
                       <Label className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
@@ -383,7 +362,7 @@ export const Sidebar = ({
                       {selectedObject?.components?.filter(c => c.type === 'rigidbody' || c.type === 'boxCollider').map((component) => (
                         <div key={component.id} className="flex items-center justify-between p-2 bg-engine-toolbar rounded">
                           <div className="flex items-center gap-2">
-                            <Zap className="w-3 h-3 text-primary" />
+                            <Zap className="w-3 h-3 text-white" />
                             <span className="text-sm">{component.name}</span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -429,9 +408,9 @@ export const Sidebar = ({
                           <div className="flex items-center justify-between p-2 bg-engine-toolbar rounded">
                             <div className="flex items-center gap-2">
                               {component.type === 'script' ? (
-                                <Code className="w-3 h-3 text-primary" />
+                                <Code className="w-3 h-3 text-white" />
                               ) : (
-                                <Workflow className="w-3 h-3 text-primary" />
+                                <Workflow className="w-3 h-3 text-white" />
                               )}
                               <span className="text-sm">{component.name}</span>
                             </div>

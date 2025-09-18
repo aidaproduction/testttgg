@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Toolbar } from "./Toolbar";
+import { Toolbar, GizmoTool } from "./Toolbar";
 import { Sidebar } from "./Sidebar";
 import { Viewport } from "./Viewport";
 import { SpriteDialog } from "./SpriteDialog";
 import { GridPanel } from "./GridPanel";
+import { SettingsDialog } from "./SettingsDialog";
+import { usePhysics } from "@/hooks/usePhysics";
 
 export interface GameObject {
   id: string;
@@ -40,6 +42,8 @@ export interface EngineState {
   zoom: number;
   panX: number;
   panY: number;
+  selectedTool: GizmoTool;
+  sceneResolution: number;
 }
 
 export const GameEngine = () => {
@@ -52,12 +56,29 @@ export const GameEngine = () => {
     zoom: 1,
     panX: 0,
     panY: 0,
+    selectedTool: 'move',
+    sceneResolution: 100,
   });
 
   const [showSpriteDialog, setShowSpriteDialog] = useState(false);
   const [showGridPanel, setShowGridPanel] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const physics = usePhysics();
 
   const handlePlay = () => {
+    if (!engineState.isPlaying) {
+      // Initialize physics when entering play mode
+      physics.reset();
+      engineState.objects.forEach(obj => {
+        if (obj.components?.some(c => c.type === 'rigidbody' && c.enabled)) {
+          physics.addPhysicsObject(obj, obj.components);
+        }
+      });
+    } else {
+      // Clean up physics when exiting play mode
+      physics.reset();
+    }
+    
     setEngineState(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
   };
 
@@ -111,6 +132,18 @@ export const GameEngine = () => {
     setShowGridPanel(!showGridPanel);
   };
 
+  const handleToolSelect = (tool: GizmoTool) => {
+    setEngineState(prev => ({ ...prev, selectedTool: tool }));
+  };
+
+  const handleSettingsOpen = () => {
+    setShowSettingsDialog(true);
+  };
+
+  const handleSceneResolutionChange = (resolution: number) => {
+    setEngineState(prev => ({ ...prev, sceneResolution: resolution }));
+  };
+
   return (
     <div className="h-screen bg-engine-bg text-foreground overflow-hidden">
       {/* Top Toolbar */}
@@ -126,6 +159,9 @@ export const GameEngine = () => {
           onGridPanelToggle={handleGridPanelToggle}
           showGridPanel={showGridPanel}
           onViewportReset={() => handleViewportChange({ zoom: 1, panX: 0, panY: 0 })}
+          selectedTool={engineState.selectedTool}
+          onToolSelect={handleToolSelect}
+          onSettingsOpen={handleSettingsOpen}
         />
       )}
       
@@ -173,6 +209,7 @@ export const GameEngine = () => {
           onObjectSelect={handleObjectSelect}
           onObjectUpdate={handleObjectUpdate}
           onViewportChange={handleViewportChange}
+          physics={physics}
         />
       </div>
 
@@ -181,6 +218,14 @@ export const GameEngine = () => {
         open={showSpriteDialog}
         onClose={() => setShowSpriteDialog(false)}
         onSpriteCreate={handleSpriteCreated}
+      />
+      
+      {/* Settings Dialog */}
+      <SettingsDialog 
+        open={showSettingsDialog}
+        onClose={() => setShowSettingsDialog(false)}
+        sceneResolution={engineState.sceneResolution}
+        onSceneResolutionChange={handleSceneResolutionChange}
       />
     </div>
   );

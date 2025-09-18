@@ -7,6 +7,7 @@ interface ViewportProps {
   onObjectSelect: (object: GameObject | null) => void;
   onObjectUpdate: (object: GameObject) => void;
   onViewportChange: (changes: Partial<Pick<EngineState, 'zoom' | 'panX' | 'panY'>>) => void;
+  physics: any;
 }
 
 interface TouchState {
@@ -25,7 +26,8 @@ export const Viewport = ({
   engineState,
   onObjectSelect,
   onObjectUpdate,
-  onViewportChange
+  onViewportChange,
+  physics
 }: ViewportProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -110,24 +112,12 @@ export const Viewport = ({
       const worldPos = screenToWorld(touch.clientX, touch.clientY);
       const hitObject = getObjectAtPosition(worldPos.x, worldPos.y);
       
-      // Check for double tap (fast double click)
-      if (now - touchState.current.lastTouchTime < 250 && touchState.current.lastTouchCount === 1) {
-        // Double tap - select/deselect object
-        if (hitObject) {
-          onObjectSelect(hitObject);
-          setDraggedObject(hitObject);
-          setDragOffset({
-            x: worldPos.x - hitObject.x,
-            y: worldPos.y - hitObject.y
-          });
-        } else {
-          onObjectSelect(null);
-          setDraggedObject(null);
-        }
-      } else {
-        // Single tap - check if we're interacting with selected object
-        if (hitObject && hitObject === engineState.selectedObject) {
-          // Determine interaction mode based on touch position relative to object center
+      // Single tap - select object or interact with selected
+      if (hitObject) {
+        onObjectSelect(hitObject);
+        
+        // Determine interaction mode based on selected tool and object area
+        if (hitObject === engineState.selectedObject) {
           const objCenterX = hitObject.x;
           const objCenterY = hitObject.y;
           const distanceFromCenter = Math.sqrt(
@@ -135,8 +125,8 @@ export const Viewport = ({
           );
           const objRadius = Math.max(hitObject.width, hitObject.height) / 2;
           
-          if (distanceFromCenter > objRadius * 0.7) {
-            // Outer area - rotation mode
+          if (engineState.selectedTool === 'rotate') {
+            // Rotation mode - outer area
             setTouchInteraction({
               mode: 'rotate',
               startX: worldPos.x,
@@ -146,8 +136,8 @@ export const Viewport = ({
               centerX: objCenterX,
               centerY: objCenterY
             });
-          } else if (distanceFromCenter > objRadius * 0.3) {
-            // Middle area - scale mode
+          } else if (engineState.selectedTool === 'scale') {
+            // Scale mode - middle area
             setTouchInteraction({
               mode: 'scale',
               startX: worldPos.x,
@@ -158,7 +148,7 @@ export const Viewport = ({
               centerY: objCenterY
             });
           } else {
-            // Inner area - move mode
+            // Move mode (default)
             setTouchInteraction(null);
             setDraggedObject(hitObject);
             setDragOffset({
@@ -166,17 +156,14 @@ export const Viewport = ({
               y: worldPos.y - hitObject.y
             });
           }
-        } else if (hitObject) {
-          // Select different object
-          onObjectSelect(hitObject);
-        } else {
-          // Start panning
-          onObjectSelect(null);
-          touchState.current.panStartX = engineState.panX;
-          touchState.current.panStartY = engineState.panY;
-          touchState.current.dragStartX = touch.clientX;
-          touchState.current.dragStartY = touch.clientY;
         }
+      } else {
+        // Start panning
+        onObjectSelect(null);
+        touchState.current.panStartX = engineState.panX;
+        touchState.current.panStartY = engineState.panY;
+        touchState.current.dragStartX = touch.clientX;
+        touchState.current.dragStartY = touch.clientY;
       }
       
       touchState.current.isDragging = true;
@@ -188,7 +175,7 @@ export const Viewport = ({
     
     touchState.current.lastTouchTime = now;
     touchState.current.lastTouchCount = touches.length;
-  }, [engineState, onObjectSelect, touchInteraction]);
+  }, [engineState, onObjectSelect]);
 
   // Handle touch move
   const handleTouchMove = useCallback((e: TouchEvent) => {
@@ -219,7 +206,7 @@ export const Viewport = ({
         const updatedObject = { ...engineState.selectedObject, rotation: newRotation };
         onObjectUpdate(updatedObject);
       } else if (touchInteraction && touchInteraction.mode === 'scale' && engineState.selectedObject) {
-        // Handle scaling
+        // Handle scaling - proportional scaling
         const currentDistance = Math.sqrt(
           Math.pow(worldPos.x - touchInteraction.centerX, 2) + 
           Math.pow(worldPos.y - touchInteraction.centerY, 2)
@@ -293,7 +280,7 @@ export const Viewport = ({
   const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     if (!engineState.showGrid || engineState.isPlaying) return;
     
-    ctx.strokeStyle = 'hsl(220, 10%, 20%)';
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.15)'; // More subtle grid
     ctx.lineWidth = 0.5;
     
     const startX = Math.floor((-engineState.panX - width / 2 / engineState.zoom) / GRID_SIZE) * GRID_SIZE;
@@ -341,7 +328,16 @@ export const Viewport = ({
       img.src = obj.texture;
       if (img.complete) {
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = obj.imageQuality && obj.imageQuality < 50 ? 'low' : 'high';
+        // Image quality system: 5-700 range
+        const quality = obj.imageQuality || 100;
+        if (quality < 50) {
+          ctx.imageSmoothingQuality = 'low';
+          ctx.filter = `blur(${Math.max(0, (50 - quality) * 0.1)}px)`;
+        } else {
+          ctx.imageSmoothingQuality = quality > 300 ? 'high' : 'medium';
+          ctx.filter = 'none';
+        }
+        
         ctx.drawImage(
           img,
           screenX - screenWidth / 2,
@@ -349,6 +345,7 @@ export const Viewport = ({
           screenWidth,
           screenHeight
         );
+        ctx.filter = 'none'; // Reset filter
       }
     } else {
       // Draw solid color
@@ -374,25 +371,25 @@ export const Viewport = ({
         ctx.translate(-screenX, -screenY);
       }
       
-      // Very soft transparent purple glow - matching reference image
-      ctx.shadowColor = '#8b5cf6';
-      ctx.shadowBlur = 8;
-      ctx.strokeStyle = '#8b5cf6';
+      // Subtle transparent purple glow - more subtle and professional
+      ctx.shadowColor = 'rgba(139, 92, 246, 0.3)';
+      ctx.shadowBlur = 4;
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
       ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.15;
+      ctx.globalAlpha = 0.6;
       
       ctx.strokeRect(
-        screenX - screenWidth / 2 - 3,
-        screenY - screenHeight / 2 - 3,
-        screenWidth + 6,
-        screenHeight + 6
+        screenX - screenWidth / 2 - 2,
+        screenY - screenHeight / 2 - 2,
+        screenWidth + 4,
+        screenHeight + 4
       );
       
       ctx.restore();
     }
   };
 
-  // Render loop
+  // Render loop with physics integration
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -403,20 +400,43 @@ export const Viewport = ({
     const width = canvas.width;
     const height = canvas.height;
     
+    // Apply scene resolution scaling
+    const resolutionScale = engineState.sceneResolution / 100;
+    ctx.save();
+    ctx.scale(resolutionScale, resolutionScale);
+    
     // Clear canvas
     ctx.fillStyle = 'hsl(225, 12%, 8%)';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, width / resolutionScale, height / resolutionScale);
     
     // Draw grid
-    drawGrid(ctx, width, height);
+    drawGrid(ctx, width / resolutionScale, height / resolutionScale);
+    
+    // Update physics in play mode
+    if (engineState.isPlaying) {
+      const physicsObjects = physics.step();
+      
+      // Update object positions from physics
+      physicsObjects.forEach((physicsObj: any) => {
+        const gameObject = engineState.objects.find(obj => obj.id === physicsObj.id);
+        if (gameObject && (gameObject.x !== physicsObj.x || gameObject.y !== physicsObj.y)) {
+          onObjectUpdate({
+            ...gameObject, 
+            x: physicsObj.x, 
+            y: physicsObj.y
+          });
+        }
+      });
+    }
     
     // Draw objects sorted by zIndex
     const sortedObjects = [...engineState.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
     sortedObjects.forEach(obj => {
-      drawObject(ctx, obj, width, height);
+      drawObject(ctx, obj, width / resolutionScale, height / resolutionScale);
     });
     
-  }, [engineState]);
+    ctx.restore();
+  }, [engineState, physics, onObjectUpdate]);
 
   // Setup canvas and event listeners
   useEffect(() => {
