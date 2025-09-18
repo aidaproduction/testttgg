@@ -19,24 +19,28 @@ export const usePhysics = () => {
       Matter.Engine.clear(engine.current);
     }
     
-    // Create new engine
+    // Create new engine with tuned iterations for more stable collisions
     engine.current = Matter.Engine.create();
-    engine.current.world.gravity.y = 1; // Real gravity
+    engine.current.world.gravity.y = 1;
     engine.current.world.gravity.x = 0;
+    // Improve collision robustness (reduces tunneling)
+    (engine.current as any).velocityIterations = 8;
+    (engine.current as any).positionIterations = 8;
+    (engine.current as any).constraintIterations = 4;
     
     physicsObjects.current = [];
     
-    // Add ground
-    const ground = Matter.Bodies.rectangle(0, 400, 2000, 60, { 
+    // Static boundaries (large, off-screen)
+    const ground = Matter.Bodies.rectangle(0, 400, 4000, 120, { 
       isStatic: true,
+      friction: 1,
+      restitution: 0,
       render: { fillStyle: 'transparent' }
     });
-    Matter.World.add(engine.current.world, ground);
-    
-    // Add side walls
-    const leftWall = Matter.Bodies.rectangle(-500, 0, 60, 1000, { isStatic: true });
-    const rightWall = Matter.Bodies.rectangle(500, 0, 60, 1000, { isStatic: true });
-    Matter.World.add(engine.current.world, [leftWall, rightWall]);
+    const ceiling = Matter.Bodies.rectangle(0, -600, 4000, 120, { isStatic: true, render: { fillStyle: 'transparent' } });
+    const leftWall = Matter.Bodies.rectangle(-1000, 0, 120, 3000, { isStatic: true, render: { fillStyle: 'transparent' } });
+    const rightWall = Matter.Bodies.rectangle(1000, 0, 120, 3000, { isStatic: true, render: { fillStyle: 'transparent' } });
+    Matter.World.add(engine.current.world, [ground, ceiling, leftWall, rightWall]);
   };
 
   const addPhysicsObject = (gameObject: GameObject, components: any[]) => {
@@ -54,18 +58,20 @@ export const usePhysics = () => {
         gameObject.height * (gameObject.scale?.y || 1),
         {
           mass: rigidbody.properties?.mass || 1,
-          frictionAir: rigidbody.properties?.drag || 0.01,
-          restitution: 0.6, // Bounce
-          friction: 0.8,
+          frictionAir: rigidbody.properties?.drag ?? 0.01,
+          restitution: 0.1,
+          friction: 0.7,
+          slop: 0.05,
           render: { fillStyle: 'transparent' }
         }
       );
 
-      // Set initial velocity if object was moving
+      // Rigidbody type
       if (rigidbody.properties?.gravityScale !== undefined && rigidbody.properties.gravityScale === 0) {
         body.isStatic = true;
       }
-
+      body.label = gameObject.id;
+ 
       Matter.World.add(engine.current.world, body);
       
       const physicsObject: PhysicsObject = {

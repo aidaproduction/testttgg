@@ -17,18 +17,19 @@ export const SettingsDialog = ({
   sceneResolution,
   onSceneResolutionChange
 }: SettingsDialogProps) => {
-  const [resolution, setResolution] = useState<string | number>(sceneResolution);
-
+  const [resolution, setResolution] = useState<string>(String(sceneResolution));
+ 
   const handleSave = () => {
-    // Allow any number but ensure it's positive
-    const finalResolution = Math.max(1, typeof resolution === 'string' ? 100 : resolution);
+    const parsed = parseFloat(resolution);
+    const finalResolution = Number.isFinite(parsed) ? Math.max(1, parsed) : 100;
     onSceneResolutionChange(finalResolution);
     onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-engine-panel border-border" onPointerDownOutside={(e) => e.preventDefault()}>
+      {/* prevent auto focus to avoid mobile keyboard popping up */}
+      <DialogContent className="sm:max-w-md bg-engine-panel border-border" onOpenAutoFocus={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()} >
         <DialogHeader>
           <DialogTitle className="text-foreground">Configurações</DialogTitle>
         </DialogHeader>
@@ -40,21 +41,12 @@ export const SettingsDialog = ({
             </Label>
             <Input
               id="resolution"
-              type="number"
+              type="text"
               value={resolution}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === '') {
-                  setResolution('');
-                } else {
-                  const numValue = parseInt(value);
-                  setResolution(isNaN(numValue) ? 100 : numValue);
-                }
-              }}
+              onChange={(e) => setResolution(e.target.value)}
               className="bg-engine-toolbar border-border"
               placeholder="100"
               autoComplete="off"
-              inputMode="none"
             />
             <p className="text-xs text-muted-foreground mt-1">
               Valores baixos: pixelado (5-50) | Valores altos: nítido (100-700)

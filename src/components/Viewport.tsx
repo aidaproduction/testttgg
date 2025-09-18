@@ -49,7 +49,10 @@ export const Viewport = ({
 
   const [draggedObject, setDraggedObject] = useState<GameObject | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-
+  // Image cache for performance
+  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [, forceRerender] = useState(0);
+  
   // Grid size
   const GRID_SIZE = 32;
   
@@ -59,7 +62,8 @@ export const Viewport = ({
     startX: number;
     startY: number;
     startRotation: number;
-    startScale: number;
+    startScaleX: number;
+    startScaleY: number;
     centerX: number;
     centerY: number;
   } | null>(null);
@@ -135,7 +139,6 @@ export const Viewport = ({
                 startX: worldPos.x,
                 startY: worldPos.y,
                 startRotation: hitObject.rotation || 0,
-                startScale: hitObject.scale?.x || 1,
                 centerX: hitObject.x,
                 centerY: hitObject.y
               });
@@ -145,7 +148,8 @@ export const Viewport = ({
                 startX: worldPos.x,
                 startY: worldPos.y,
                 startRotation: hitObject.rotation || 0,
-                startScale: hitObject.scale?.x || 1,
+                startScaleX: hitObject.scale?.x ?? 1,
+                startScaleY: hitObject.scale?.y ?? 1,
                 centerX: hitObject.x,
                 centerY: hitObject.y
               });
@@ -220,29 +224,17 @@ export const Viewport = ({
         const updatedObject = { ...engineState.selectedObject, rotation: newRotation };
         onObjectUpdate(updatedObject);
       } else if (touchInteraction && touchInteraction.mode === 'scale' && engineState.selectedObject) {
-        // Handle directional scaling - scale based on drag direction
+        // Directional stretch scaling: horizontal by deltaX, vertical by deltaY
         const deltaX = worldPos.x - touchInteraction.startX;
         const deltaY = worldPos.y - touchInteraction.startY;
         
-        // Calculate scale change based on distance from start
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        const scaleChange = distance * 0.01; // Sensitivity factor
-        
-        // Determine if we're scaling up or down based on movement direction
-        const centerDeltaX = worldPos.x - touchInteraction.centerX;
-        const centerDeltaY = worldPos.y - touchInteraction.centerY;
-        const startCenterDeltaX = touchInteraction.startX - touchInteraction.centerX;
-        const startCenterDeltaY = touchInteraction.startY - touchInteraction.centerY;
-        
-        const currentDistanceFromCenter = Math.sqrt(centerDeltaX * centerDeltaX + centerDeltaY * centerDeltaY);
-        const startDistanceFromCenter = Math.sqrt(startCenterDeltaX * startCenterDeltaX + startCenterDeltaY * startCenterDeltaY);
-        
-        const scaleDirection = currentDistanceFromCenter > startDistanceFromCenter ? 1 : -1;
-        const newScale = Math.max(0.1, Math.min(5, touchInteraction.startScale + (scaleChange * scaleDirection)));
+        const SENSITIVITY = 0.01; // scaling per world unit dragged
+        const newScaleX = Math.max(0.1, Math.min(10, touchInteraction.startScaleX + deltaX * SENSITIVITY));
+        const newScaleY = Math.max(0.1, Math.min(10, touchInteraction.startScaleY + deltaY * SENSITIVITY));
         
         const updatedObject = { 
           ...engineState.selectedObject, 
-          scale: { x: newScale, y: newScale }
+          scale: { x: newScaleX, y: newScaleY }
         };
         onObjectUpdate(updatedObject);
       } else if (draggedObject) {
@@ -342,21 +334,20 @@ export const Viewport = ({
     
     // Draw object
     if (obj.texture) {
-      // Draw texture if available
-      const img = new Image();
-      img.src = obj.texture;
+      // Pixel-perfect rendering with cache (no blur)
+      let img = imageCacheRef.current.get(obj.texture);
+      if (!img) {
+        img = new Image();
+        img.decoding = 'async';
+        img.src = obj.texture;
+        img.onload = () => {
+          // trigger a rerender to draw once loaded
+          forceRerender(v => v + 1);
+        };
+        imageCacheRef.current.set(obj.texture, img);
+      }
       if (img.complete) {
-        ctx.imageSmoothingEnabled = true;
-        // Image quality system: 5-700 range
-        const quality = obj.imageQuality || 100;
-        if (quality < 50) {
-          ctx.imageSmoothingQuality = 'low';
-          ctx.filter = `blur(${Math.max(0, (50 - quality) * 0.1)}px)`;
-        } else {
-          ctx.imageSmoothingQuality = quality > 300 ? 'high' : 'medium';
-          ctx.filter = 'none';
-        }
-        
+        ctx.filter = 'none';
         ctx.drawImage(
           img,
           screenX - screenWidth / 2,
@@ -364,7 +355,6 @@ export const Viewport = ({
           screenWidth,
           screenHeight
         );
-        ctx.filter = 'none'; // Reset filter
       }
     } else {
       // Draw solid color
@@ -390,12 +380,12 @@ export const Viewport = ({
         ctx.translate(-screenX, -screenY);
       }
       
-      // Subtle transparent purple glow - more subtle and professional
-      ctx.shadowColor = 'rgba(139, 92, 246, 0.3)';
-      ctx.shadowBlur = 4;
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.6;
+      // Visible selection glow
+      ctx.shadowColor = 'rgba(139, 92, 246, 0.45)';
+      ctx.shadowBlur = 6;
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
       
       ctx.strokeRect(
         screenX - screenWidth / 2 - 2,
@@ -403,6 +393,7 @@ export const Viewport = ({
         screenWidth + 4,
         screenHeight + 4
       );
+      ctx.setLineDash([]);
       
       ctx.restore();
     }
@@ -424,6 +415,10 @@ export const Viewport = ({
       const resolutionScale = engineState.sceneResolution / 100;
       ctx.save();
       ctx.scale(resolutionScale, resolutionScale);
+      // Pixelated rendering in play mode
+      // Disable smoothing for all drawImage operations
+      // Note: must be set on every context state
+      (ctx as any).imageSmoothingEnabled = false;
       
       // Clear canvas
       ctx.fillStyle = 'hsl(225, 12%, 8%)';

@@ -165,20 +165,8 @@ export const GameEngine = () => {
         />
       )}
       
-      {/* Play Mode Toolbar - minimal */}
-      {engineState.isPlaying && (
-        <div className="h-16 bg-engine-toolbar border-b border-border flex items-center px-4">
-          <button
-            onClick={handlePlay}
-            className="bg-engine-panel hover:bg-engine-panel-hover rounded p-2 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Voltar ao Editor
-          </button>
-        </div>
-      )}
+      {/* Play Mode: no top bar, only floating back button */}
+      {engineState.isPlaying && null}
       
       {/* Grid Panel - Only in editor mode */}
       {showGridPanel && !engineState.isPlaying && (
@@ -191,7 +179,7 @@ export const GameEngine = () => {
       )}
       
       {/* Main Content */}
-      <div className="flex h-[calc(100vh-64px)]">
+      <div className={`flex ${engineState.isPlaying ? 'h-screen' : 'h-[calc(100vh-64px)]'} relative`}>
         {/* Left Sidebar - Only in editor mode */}
         {!engineState.isPlaying && (
           <Sidebar 
@@ -211,8 +199,17 @@ export const GameEngine = () => {
           onViewportChange={handleViewportChange}
           physics={physics}
         />
+        {engineState.isPlaying && (
+          <button
+            onClick={handlePlay}
+            className="absolute top-4 left-4 bg-engine-panel hover:bg-engine-panel-hover border border-border text-foreground/90 rounded px-3 py-1 text-sm shadow"
+            title="Voltar ao Editor"
+          >
+            Voltar
+          </button>
+        )}
       </div>
-
+ 
       {/* Sprite Creation Dialog */}
       <SpriteDialog 
         open={showSpriteDialog}
