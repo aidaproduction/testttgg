@@ -65,18 +65,18 @@ export const GameEngine = () => {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const physics = usePhysics();
 
-  const handlePlay = () => {
+  const handlePlay = async () => {
     if (!engineState.isPlaying) {
       // Initialize physics when entering play mode
-      physics.reset();
-      engineState.objects.forEach(obj => {
-        if (obj.components?.some(c => c.type === 'rigidbody' && c.enabled)) {
-          physics.addPhysicsObject(obj, obj.components);
+      await physics.reset();
+      for (const obj of engineState.objects) {
+        if (obj.components?.some(c => (c.type === 'rigidbody' || c.type === 'boxCollider') && c.enabled)) {
+          await physics.addPhysicsObject(obj, obj.components);
         }
-      });
+      }
     } else {
       // Clean up physics when exiting play mode
-      physics.reset();
+      await physics.reset();
     }
     
     setEngineState(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
@@ -116,7 +116,7 @@ export const GameEngine = () => {
     }));
   };
 
-  const handleViewportChange = (changes: Partial<Pick<EngineState, 'zoom' | 'panX' | 'panY'>>) => {
+  const handleViewportChange = (changes: Partial<Pick<EngineState, 'zoom' | 'panX' | 'panY' | 'selectedTool'>>) => {
     setEngineState(prev => ({ ...prev, ...changes }));
   };
 

@@ -6,7 +6,7 @@ interface ViewportProps {
   engineState: EngineState;
   onObjectSelect: (object: GameObject | null) => void;
   onObjectUpdate: (object: GameObject) => void;
-  onViewportChange: (changes: Partial<Pick<EngineState, 'zoom' | 'panX' | 'panY'>>) => void;
+  onViewportChange: (changes: Partial<Pick<EngineState, 'zoom' | 'panX' | 'panY' | 'selectedTool'>>) => void;
   physics: any;
 }
 
@@ -130,40 +130,37 @@ export const Viewport = ({
           onObjectSelect(hitObject);
           touchState.current.lastTapTime = 0; // Reset to avoid triple tap
         } else {
-          // Single tap - prepare for possible double tap, start interaction if already selected
-          if (hitObject === engineState.selectedObject) {
-            // Already selected object - start interaction based on tool
-            if (engineState.selectedTool === 'rotate') {
-              setTouchInteraction({
-                mode: 'rotate',
-                startX: worldPos.x,
-                startY: worldPos.y,
-                startRotation: hitObject.rotation || 0,
-                startScaleX: hitObject.scale?.x ?? 1,
-                startScaleY: hitObject.scale?.y ?? 1,
-                centerX: hitObject.x,
-                centerY: hitObject.y
-              });
-            } else if (engineState.selectedTool === 'scale') {
-              setTouchInteraction({
-                mode: 'scale',
-                startX: worldPos.x,
-                startY: worldPos.y,
-                startRotation: hitObject.rotation || 0,
-                startScaleX: hitObject.scale?.x ?? 1,
-                startScaleY: hitObject.scale?.y ?? 1,
-                centerX: hitObject.x,
-                centerY: hitObject.y
-              });
-            } else {
-              // Move mode (default)
-              setTouchInteraction(null);
-              setDraggedObject(hitObject);
-              setDragOffset({
-                x: worldPos.x - hitObject.x,
-                y: worldPos.y - hitObject.y
-              });
-            }
+          // Single tap - prepare for possible double tap, start interaction based on tool
+          if (engineState.selectedTool === 'rotate') {
+            setTouchInteraction({
+              mode: 'rotate',
+              startX: worldPos.x,
+              startY: worldPos.y,
+              startRotation: hitObject.rotation || 0,
+              startScaleX: hitObject.scale?.x ?? 1,
+              startScaleY: hitObject.scale?.y ?? 1,
+              centerX: hitObject.x,
+              centerY: hitObject.y
+            });
+          } else if (engineState.selectedTool === 'scale') {
+            setTouchInteraction({
+              mode: 'scale',
+              startX: worldPos.x,
+              startY: worldPos.y,
+              startRotation: hitObject.rotation || 0,
+              startScaleX: hitObject.scale?.x ?? 1,
+              startScaleY: hitObject.scale?.y ?? 1,
+              centerX: hitObject.x,
+              centerY: hitObject.y
+            });
+          } else {
+            // Move mode (default)
+            setTouchInteraction(null);
+            setDraggedObject(hitObject);
+            setDragOffset({
+              x: worldPos.x - hitObject.x,
+              y: worldPos.y - hitObject.y
+            });
           }
           touchState.current.lastTapTime = now;
           touchState.current.lastTapTarget = hitObject;
@@ -325,6 +322,15 @@ export const Viewport = ({
     const screenWidth = obj.width * engineState.zoom * (obj.scale?.x || 1);
     const screenHeight = obj.height * engineState.zoom * (obj.scale?.y || 1);
     
+    // Frustum culling for performance
+    const margin = 100;
+    if (screenX + screenWidth / 2 < -margin || 
+        screenX - screenWidth / 2 > width + margin || 
+        screenY + screenHeight / 2 < -margin || 
+        screenY - screenHeight / 2 > height + margin) {
+      return; // Skip drawing objects outside viewport
+    }
+    
     ctx.save();
     
     // Apply rotation if exists
@@ -336,20 +342,25 @@ export const Viewport = ({
     
     // Draw object
     if (obj.texture) {
-      // Pixel-perfect rendering with cache (no blur)
+      // Optimized image rendering with cache
       let img = imageCacheRef.current.get(obj.texture);
       if (!img) {
         img = new Image();
         img.decoding = 'async';
+        img.loading = 'eager'; // Improve loading for editor
         img.src = obj.texture;
         img.onload = () => {
-          // trigger a rerender to draw once loaded
-          forceRerender(v => v + 1);
+          // Debounced rerender to avoid excessive renders
+          setTimeout(() => {
+            forceRerender(v => v + 1);
+          }, 16); // ~60fps throttle
         };
         imageCacheRef.current.set(obj.texture, img);
       }
-      if (img.complete) {
-        ctx.filter = 'none';
+      if (img.complete && img.naturalWidth > 0) {
+        // Optimize rendering settings
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(
           img,
           screenX - screenWidth / 2,
@@ -371,7 +382,7 @@ export const Viewport = ({
     
     ctx.restore();
     
-    // Draw selection outline with soft purple glow that rotates with object
+    // Draw modern 2D engine selection effect
     if (engineState.selectedObject?.id === obj.id && !engineState.isPlaying) {
       ctx.save();
       
@@ -382,20 +393,50 @@ export const Viewport = ({
         ctx.translate(-screenX, -screenY);
       }
       
-      // Visible selection glow
-      ctx.shadowColor = 'rgba(139, 92, 246, 0.45)';
-      ctx.shadowBlur = 6;
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.8)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
+      // Outer glow
+      ctx.shadowColor = 'rgba(59, 130, 246, 0.6)';
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+      ctx.lineWidth = 1;
       
+      // Main selection border
+      ctx.strokeRect(
+        screenX - screenWidth / 2 - 4,
+        screenY - screenHeight / 2 - 4,
+        screenWidth + 8,
+        screenHeight + 8
+      );
+      
+      // Inner bright border
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(147, 197, 253, 0.9)';
+      ctx.lineWidth = 1;
       ctx.strokeRect(
         screenX - screenWidth / 2 - 2,
         screenY - screenHeight / 2 - 2,
         screenWidth + 4,
         screenHeight + 4
       );
-      ctx.setLineDash([]);
+      
+      // Corner indicators
+      const cornerSize = 8;
+      ctx.fillStyle = 'rgba(59, 130, 246, 1)';
+      
+      // Top-left corner
+      ctx.fillRect(screenX - screenWidth / 2 - 4, screenY - screenHeight / 2 - 4, cornerSize, 2);
+      ctx.fillRect(screenX - screenWidth / 2 - 4, screenY - screenHeight / 2 - 4, 2, cornerSize);
+      
+      // Top-right corner
+      ctx.fillRect(screenX + screenWidth / 2 + 4 - cornerSize, screenY - screenHeight / 2 - 4, cornerSize, 2);
+      ctx.fillRect(screenX + screenWidth / 2 + 2, screenY - screenHeight / 2 - 4, 2, cornerSize);
+      
+      // Bottom-left corner
+      ctx.fillRect(screenX - screenWidth / 2 - 4, screenY + screenHeight / 2 + 2, cornerSize, 2);
+      ctx.fillRect(screenX - screenWidth / 2 - 4, screenY + screenHeight / 2 + 4 - cornerSize, 2, cornerSize);
+      
+      // Bottom-right corner
+      ctx.fillRect(screenX + screenWidth / 2 + 4 - cornerSize, screenY + screenHeight / 2 + 2, cornerSize, 2);
+      ctx.fillRect(screenX + screenWidth / 2 + 2, screenY + screenHeight / 2 + 4 - cornerSize, 2, cornerSize);
       
       ctx.restore();
     }
@@ -414,17 +455,22 @@ export const Viewport = ({
     
     // Apply scene resolution scaling only in play mode
     if (engineState.isPlaying) {
-      const resolutionScale = engineState.sceneResolution / 100;
-      ctx.save();
-      ctx.scale(resolutionScale, resolutionScale);
-      // Pixelated rendering in play mode
-      // Disable smoothing for all drawImage operations
-      // Note: must be set on every context state
-      (ctx as any).imageSmoothingEnabled = false;
+      // Create internal canvas for pixelation effect
+      const internalCanvas = document.createElement('canvas');
+      const internalWidth = width * (engineState.sceneResolution / 100);
+      const internalHeight = height * (engineState.sceneResolution / 100);
+      internalCanvas.width = internalWidth;
+      internalCanvas.height = internalHeight;
       
-      // Clear canvas
-      ctx.fillStyle = 'hsl(225, 12%, 8%)';
-      ctx.fillRect(0, 0, width / resolutionScale, height / resolutionScale);
+      const internalCtx = internalCanvas.getContext('2d');
+      if (!internalCtx) return;
+      
+      // Disable image smoothing for pixelated effect
+      internalCtx.imageSmoothingEnabled = false;
+      
+      // Clear internal canvas
+      internalCtx.fillStyle = 'hsl(225, 12%, 8%)';
+      internalCtx.fillRect(0, 0, internalWidth, internalHeight);
       
       // Update physics in play mode
       const physicsObjects = physics.step();
@@ -432,7 +478,7 @@ export const Viewport = ({
       // Update object positions from physics
       physicsObjects.forEach((physicsObj: any) => {
         const gameObject = engineState.objects.find(obj => obj.id === physicsObj.id);
-        if (gameObject && (gameObject.x !== physicsObj.x || gameObject.y !== physicsObj.y)) {
+        if (gameObject && (Math.abs(gameObject.x - physicsObj.x) > 0.1 || Math.abs(gameObject.y - physicsObj.y) > 0.1)) {
           onObjectUpdate({
             ...gameObject, 
             x: physicsObj.x, 
@@ -441,15 +487,18 @@ export const Viewport = ({
         }
       });
       
-      // Draw objects sorted by zIndex
+      // Draw objects sorted by zIndex to internal canvas
       const sortedObjects = [...engineState.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
       sortedObjects.forEach(obj => {
-        drawObject(ctx, obj, width / resolutionScale, height / resolutionScale);
+        drawObject(internalCtx, obj, internalWidth, internalHeight);
       });
       
-      ctx.restore();
+      // Draw internal canvas to main canvas with nearest neighbor scaling
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(internalCanvas, 0, 0, width, height);
     } else {
-      // Editor mode - no resolution scaling
+      // Editor mode - no resolution scaling, smooth rendering
+      ctx.imageSmoothingEnabled = true;
       ctx.fillStyle = 'hsl(225, 12%, 8%)';
       ctx.fillRect(0, 0, width, height);
       
@@ -510,11 +559,73 @@ export const Viewport = ({
         style={{ touchAction: 'none' }}
       />
       
-      {/* Viewport Info - Only in editor mode */}
+      {/* Gizmo Controls - Only in editor mode */}
       {!engineState.isPlaying && (
-        <div className="absolute top-4 left-4 bg-engine-panel/80 backdrop-blur-sm rounded px-3 py-1 text-xs text-muted-foreground">
-          Zoom: {Math.round(engineState.zoom * 100)}% | 
-          Pan: {Math.round(engineState.panX)}, {Math.round(engineState.panY)}
+        <div className="absolute top-4 left-4 bg-engine-panel/90 backdrop-blur-sm rounded-lg p-2 flex items-center gap-2">
+          <button
+            onClick={() => onViewportChange({ zoom: 1, panX: 0, panY: 0 })}
+            className="p-2 rounded-md bg-engine-accent/20 hover:bg-engine-accent/30 transition-colors"
+            title="Reset View"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+          </button>
+          
+          <div className="w-px h-6 bg-border"></div>
+          
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => engineState.selectedTool === 'move' ? null : onViewportChange({ selectedTool: 'move' })}
+              className={cn(
+                "p-2 rounded-md transition-all duration-200",
+                engineState.selectedTool === 'move'
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                  : "bg-engine-accent/20 hover:bg-engine-accent/30"
+              )}
+              title="Move"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3"/>
+                <path d="M2 12h20M12 2v20"/>
+              </svg>
+            </button>
+            
+            <button
+              onClick={() => engineState.selectedTool === 'rotate' ? null : onViewportChange({ selectedTool: 'rotate' })}
+              className={cn(
+                "p-2 rounded-md transition-all duration-200",
+                engineState.selectedTool === 'rotate'
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                  : "bg-engine-accent/20 hover:bg-engine-accent/30"
+              )}
+              title="Rotate"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21.5 2v6h-6"/>
+                <path d="M21.5 8a10 10 0 1 1-3.5-7.5l3.5 3.5"/>
+              </svg>
+            </button>
+            
+            <button
+              onClick={() => engineState.selectedTool === 'scale' ? null : onViewportChange({ selectedTool: 'scale' })}
+              className={cn(
+                "p-2 rounded-md transition-all duration-200",
+                engineState.selectedTool === 'scale'
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                  : "bg-engine-accent/20 hover:bg-engine-accent/30"
+              )}
+              title="Scale"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 21l-6-6m6 6v-4.8m0 4.8h-4.8"/>
+                <path d="M3 16.2V21m0 0h4.8M3 21l6-6"/>
+                <path d="M21 7.8V3m0 0h-4.8M21 3l-6 6"/>
+                <path d="M3 7.8V3m0 0h4.8M3 3l6 6"/>
+              </svg>
+            </button>
+          </div>
         </div>
       )}
       

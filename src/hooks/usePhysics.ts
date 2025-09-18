@@ -1,78 +1,94 @@
 import { useRef } from 'react';
-import Matter from 'matter-js';
 import { GameObject } from '@/components/GameEngine';
 
 interface PhysicsObject {
   id: string;
   x: number;
   y: number;
-  body: Matter.Body;
+  body: any;
 }
 
 export const usePhysics = () => {
-  const engine = useRef<Matter.Engine | null>(null);
+  const worldRef = useRef<any>(null);
   const physicsObjects = useRef<PhysicsObject[]>([]);
+  const rapierRef = useRef<any>(null);
 
-  const reset = () => {
-    if (engine.current) {
-      Matter.World.clear(engine.current.world, false);
-      Matter.Engine.clear(engine.current);
+  const initRapier = async () => {
+    if (!rapierRef.current) {
+      const RAPIER = await import('@dimforge/rapier2d');
+      rapierRef.current = RAPIER;
+    }
+    return rapierRef.current;
+  };
+
+  const reset = async () => {
+    const RAPIER = await initRapier();
+    
+    if (worldRef.current) {
+      worldRef.current.free();
     }
     
-    // Create new engine with tuned iterations for more stable collisions
-    engine.current = Matter.Engine.create();
-    engine.current.world.gravity.y = 1;
-    engine.current.world.gravity.x = 0;
-    // Improve collision robustness (reduces tunneling)
-    (engine.current as any).velocityIterations = 8;
-    (engine.current as any).positionIterations = 8;
-    (engine.current as any).constraintIterations = 4;
+    // Create physics world with proper gravity (slower, more realistic)
+    const gravity = new RAPIER.Vector2(0.0, 300.0); // Much slower gravity
+    worldRef.current = new RAPIER.World(gravity);
     
     physicsObjects.current = [];
     
-    // Static boundaries (large, off-screen)
-    const ground = Matter.Bodies.rectangle(0, 400, 4000, 120, { 
-      isStatic: true,
-      friction: 1,
-      restitution: 0,
-      render: { fillStyle: 'transparent' }
-    });
-    const ceiling = Matter.Bodies.rectangle(0, -600, 4000, 120, { isStatic: true, render: { fillStyle: 'transparent' } });
-    const leftWall = Matter.Bodies.rectangle(-1000, 0, 120, 3000, { isStatic: true, render: { fillStyle: 'transparent' } });
-    const rightWall = Matter.Bodies.rectangle(1000, 0, 120, 3000, { isStatic: true, render: { fillStyle: 'transparent' } });
-    Matter.World.add(engine.current.world, [ground, ceiling, leftWall, rightWall]);
+    // Create static boundaries
+    const groundCollider = RAPIER.ColliderDesc.cuboid(2000, 60)
+      .setTranslation(0, 400)
+      .setFriction(0.8)
+      .setRestitution(0.1);
+    worldRef.current.createCollider(groundCollider);
+    
+    const ceilingCollider = RAPIER.ColliderDesc.cuboid(2000, 60)
+      .setTranslation(0, -600);
+    worldRef.current.createCollider(ceilingCollider);
+    
+    const leftWallCollider = RAPIER.ColliderDesc.cuboid(60, 1500)
+      .setTranslation(-1000, 0);
+    worldRef.current.createCollider(leftWallCollider);
+    
+    const rightWallCollider = RAPIER.ColliderDesc.cuboid(60, 1500)
+      .setTranslation(1000, 0);
+    worldRef.current.createCollider(rightWallCollider);
   };
 
-  const addPhysicsObject = (gameObject: GameObject, components: any[]) => {
-    if (!engine.current) return;
+  const addPhysicsObject = async (gameObject: GameObject, components: any[]) => {
+    if (!worldRef.current) return;
 
+    const RAPIER = await initRapier();
     const rigidbody = components.find(c => c.type === 'rigidbody' && c.enabled);
     const collider = components.find(c => c.type === 'boxCollider' && c.enabled);
 
-    if (rigidbody && collider) {
-      // Create physics body
-      const body = Matter.Bodies.rectangle(
-        gameObject.x, 
-        gameObject.y, 
-        gameObject.width * (gameObject.scale?.x || 1), 
-        gameObject.height * (gameObject.scale?.y || 1),
-        {
-          mass: rigidbody.properties?.mass || 1,
-          frictionAir: rigidbody.properties?.drag ?? 0.01,
-          restitution: 0.1,
-          friction: 0.7,
-          slop: 0.05,
-          render: { fillStyle: 'transparent' }
+    if (rigidbody || collider) {
+      const width = gameObject.width * (gameObject.scale?.x || 1);
+      const height = gameObject.height * (gameObject.scale?.y || 1);
+      
+      let rigidBodyDesc;
+      
+      if (rigidbody) {
+        // Create dynamic rigidbody if rigidbody component exists
+        if (rigidbody.properties?.gravityScale === 0) {
+          rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
+        } else {
+          rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic();
         }
-      );
-
-      // Rigidbody type
-      if (rigidbody.properties?.gravityScale !== undefined && rigidbody.properties.gravityScale === 0) {
-        body.isStatic = true;
+      } else {
+        // Static body if only collider
+        rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
       }
-      body.label = gameObject.id;
- 
-      Matter.World.add(engine.current.world, body);
+      
+      rigidBodyDesc.setTranslation(gameObject.x, gameObject.y);
+      const body = worldRef.current.createRigidBody(rigidBodyDesc);
+      
+      // Create collider
+      const colliderDesc = RAPIER.ColliderDesc.cuboid(width / 2, height / 2)
+        .setFriction(0.8)
+        .setRestitution(0.2)
+        .setDensity(rigidbody?.properties?.mass || 1);
+      
+      worldRef.current.createCollider(colliderDesc, body);
       
       const physicsObject: PhysicsObject = {
         id: gameObject.id,
@@ -86,16 +102,17 @@ export const usePhysics = () => {
   };
 
   const step = () => {
-    if (!engine.current) return physicsObjects.current;
+    if (!worldRef.current) return physicsObjects.current;
 
-    // Run physics engine
-    Matter.Engine.update(engine.current, 16.67); // ~60fps
+    // Step physics world (60fps with proper timestep)
+    worldRef.current.step();
 
     // Update positions from physics bodies
     physicsObjects.current.forEach(obj => {
       if (obj.body) {
-        obj.x = obj.body.position.x;
-        obj.y = obj.body.position.y;
+        const translation = obj.body.translation();
+        obj.x = translation.x;
+        obj.y = translation.y;
       }
     });
 
